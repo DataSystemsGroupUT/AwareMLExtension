@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import streamlit as st
 
-from .recommender_bridge import bundle_status, sync_copilot_evidence
+from .recommender_bridge import bundle_status, historical_status, sync_copilot_evidence
+from .components import hero
 
 
 def _css() -> None:
@@ -37,6 +38,7 @@ def _css() -> None:
             background:#fff;padding:15px 16px;min-height:126px}
         .copv5-label{color:#64748b;font-size:12px;margin-bottom:7px}
         .copv5-value{color:#0f172a;font-size:24px;line-height:1.2;font-weight:820}
+        div[data-testid="stButton"] button[kind="primary"] p{color:#fff!important}
         </style>
         """,
         unsafe_allow_html=True,
@@ -45,34 +47,36 @@ def _css() -> None:
 
 def render_copilot_workspace_header(state):
     _css()
+    from .copilot_design import asset_connection
     status = sync_copilot_evidence(state)
+    history = historical_status(status.get('directory') or None)
+    with st.sidebar:
+        asset_connection(status)
     frame, target = state.get("dataset"), state.get("target")
     has_dataset = frame is not None and bool(target) and target in frame.columns
     active = str(state.get("copilot_workspace_path") or "goal")
     if active not in {"goal", "historical", "dataset"}:
         active = "goal"
-    if status["ready"]:
-        prior_copy = "{} development datasets · {} validated development runs · {}-seed aggregation → global framework starting point.".format(
-            status["development_datasets"], status["underlying_runs"], len(status["seeds"]))
+    if history["ready"]:
+        prior_copy = "{} development datasets · {:,} validated development runs · {}-seed aggregation → global framework starting point.".format(
+            history["development_datasets"], history["underlying_runs"], len(history["seeds"]))
         dataset_copy = "First {:,} labeled observations + trained objective models → dataset-specific ranking of {} frameworks.".format(
-            int(status["manifest"]["profile_size"]), status["framework_count"])
+            int(history["manifest"]["profile_size"]), history["framework_count"])
         prior_status = "Available"
-        dataset_status = "Ready" if has_dataset else "Waiting for dataset + target"
+        dataset_status = ("Ready" if has_dataset else "Waiting for dataset + target") if status['ready'] else "Transfer trained models from Rocket"
     else:
-        prior_copy = "Seed-aggregated development evidence → global framework starting point after validation and training."
-        dataset_copy = "Observed labeled prefix + trained objective models → dataset-specific ranking once the model is available."
-        prior_status = "Training pending" if status["state"] == "training_pending" else "Evidence unavailable"
+        prior_copy = "Seed-aggregated development results → a global framework starting point under your priorities."
+        dataset_copy = "Observed labeled prefix + trained objective models → dataset-specific ranking of five frameworks."
+        prior_status = "Results not installed"
         dataset_status = prior_status
         if not has_dataset:
             dataset_status += " · Dataset + target required"
 
-    st.markdown(
-        '<div class="copv5-hero"><div class="copv5-kicker">Human-centred evidence orchestration</div>'
-        '<div class="copv5-title">AwareML Copilot Workspace</div>'
-        '<div class="copv5-sub">One deployment goal, three evidence levels. Interpret priorities, review '
-        'development evidence, and use the observed labeled prefix for dataset-aware recommendations.</div></div>',
-        unsafe_allow_html=True,
-    )
+    hero("HUMAN-CENTRED DECISION SUPPORT", "AwareML Copilot Workspace",
+         "Interpret your deployment goal, compare historical evidence and generate a dataset-aware framework recommendation.",
+         [("Goal interpretation", "good"),
+          ("Historical evidence available" if history['ready'] else "Historical evidence required", "good" if history['ready'] else "warn"),
+          ("Dataset-aware models available" if status['ready'] else "Dataset-aware models on Rocket", "good" if status['ready'] else "warn")])
     cards = [
         ("goal", "01 · Goal interpretation",
          "Natural-language goal → Accuracy / Runtime / Energy / CO₂ priorities, plus separate HCAI oversight requirements.", "Ready"),
@@ -89,7 +93,8 @@ def render_copilot_workspace_header(state):
                 st.caption(copy)
                 st.markdown("**{}{}**".format(readiness, " · Active" if active == key else ""))
     title = "Dataset-aware decision support" if has_dataset else "Dataset-free planning"
-    copy = ("Goal interpretation is available. Dataset-aware ranking additionally requires a trained model bundle and a labeled dataset prefix."
+    copy = ("Goal interpretation and historical comparison are available. Transfer the trained model package from Rocket to enable live dataset-aware recommendations."
+            if history['ready'] and not status['ready'] else "Goal interpretation is available. Add the experiment evidence to enable framework comparisons."
             if not status["ready"] else
             "The historical prior summarizes development evidence. Dataset-aware ranking uses the observed prefix and the active priorities.")
     st.markdown('<div class="copv5-current"><b>Current evidence mode: {}</b><br>{}</div>'.format(title, copy), unsafe_allow_html=True)
@@ -99,3 +104,4 @@ def render_copilot_workspace_header(state):
 def render_goal_framework_guidance(state, interpretation, proposal=None):
     from .copilot_recommender import render_current_goal_guidance
     return render_current_goal_guidance(state, interpretation, proposal)
+

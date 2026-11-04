@@ -1,4 +1,5 @@
 from __future__ import annotations
+from awareml.ui_v2.framework_labels import framework_label, framework_description, display_labels, display_frame, display_figure
 
 import numpy as np
 import pandas as pd
@@ -75,13 +76,13 @@ def streaming_observatory_page():
     mean_recovery = _safe_mean((result.get("drift_summary") or {}).get("recovery_rate") for result in results)
 
     cols = st.columns(4)
-    cols[0].metric("Best final accuracy", f"{best_framework} · {fmt(best_accuracy, 3)}")
-    cols[1].metric("Confirmed performance-change alerts", str(int(all_drifts)))
-    cols[2].metric("Explicit adaptation actions", str(int(all_adaptations)))
-    cols[3].metric("Mean drift recovery", fmt(mean_recovery, 2))
+    cols[0].metric(framework_label("Best final accuracy"), framework_label(f"{best_framework} · {fmt(best_accuracy, 3)}"))
+    cols[1].metric(framework_label("Confirmed performance-change alerts"), framework_label(str(int(all_drifts))))
+    cols[2].metric(framework_label("Explicit adaptation actions"), framework_label(str(int(all_adaptations))))
+    cols[3].metric(framework_label("Mean drift recovery"), framework_label(fmt(mean_recovery, 2)))
 
     section("Run overview", "Observed framework outcomes from the current active experiment.")
-    st.dataframe(frame, use_container_width=True, hide_index=True)
+    st.dataframe(display_frame(frame), use_container_width=True, hide_index=True)
 
     st.markdown(
         """
@@ -100,14 +101,14 @@ def streaming_observatory_page():
         "The current Hybrid detector preserves the useful ADWIN lineage from the earlier implementation, then adds Page-Hinkley, sustained-degradation confirmation, warm-up and minimum-separation protection.",
     )
     health = detector_health_frame(results)
-    st.dataframe(health, use_container_width=True, hide_index=True)
+    st.dataframe(display_frame(health), use_container_width=True, hide_index=True)
     adaptations = adaptation_frame(results)
     if not adaptations.empty:
         with st.expander("Recorded adaptation actions", expanded=True):
-            st.dataframe(adaptations, use_container_width=True, hide_index=True)
+            st.dataframe(display_frame(adaptations), use_container_width=True, hide_index=True)
             st.caption(
-                "awareml_reset_and_replay is an AwareML wrapper action: the framework is reset and a bounded recent labelled buffer is replayed. "
-                "It is not described as an upstream-native refit unless the backend explicitly exposes one."
+                framework_label("awareml_reset_and_replay is an AwareML wrapper action: the framework is reset and a bounded recent labelled buffer is replayed. "
+                "It is not described as an upstream-native refit unless the backend explicitly exposes one.")
             )
     else:
         st.info(
@@ -134,10 +135,10 @@ def streaming_observatory_page():
     dataset_rows = len(dataset) if isinstance(dataset, pd.DataFrame) else None
     coverage = (processed_samples / dataset_rows) if dataset_rows and processed_samples else None
     d1, d2, d3, d4 = st.columns(4)
-    d1.metric("Dataset rows available", "N/A" if dataset_rows is None else f"{dataset_rows:,}")
-    d2.metric("Rows processed in this run", f"{processed_samples:,}" if processed_samples else "N/A")
-    d3.metric("Stream coverage", "N/A" if coverage is None else "{:.1%}".format(min(1.0, coverage)))
-    d4.metric("Confirmed performance changes", str(int(all_drifts)))
+    d1.metric(framework_label("Dataset rows available"), framework_label("N/A" if dataset_rows is None else f"{dataset_rows:,}"))
+    d2.metric(framework_label("Rows processed in this run"), framework_label(f"{processed_samples:,}" if processed_samples else "N/A"))
+    d3.metric(framework_label("Stream coverage"), framework_label("N/A" if coverage is None else "{:.1%}".format(min(1.0, coverage))))
+    d4.metric(framework_label("Confirmed performance changes"), framework_label(str(int(all_drifts))))
 
     if all_drifts == 0:
         st.info(
@@ -190,15 +191,15 @@ def streaming_observatory_page():
             max_jsd = pd.to_numeric(audit["Max feature JSD"], errors="coerce").max()
             p95_jsd = pd.to_numeric(audit.get("P95 feature JSD"), errors="coerce").max()
             m1, m2, m3 = st.columns(3)
-            m1.metric("Largest feature JSD", "N/A" if pd.isna(max_jsd) else "{:.4f}".format(float(max_jsd)))
-            m2.metric("Largest window P95 JSD", "N/A" if pd.isna(p95_jsd) else "{:.4f}".format(float(p95_jsd)))
+            m1.metric(framework_label("Largest feature JSD"), framework_label("N/A" if pd.isna(max_jsd) else "{:.4f}".format(float(max_jsd))))
+            m2.metric(framework_label("Largest window P95 JSD"), framework_label("N/A" if pd.isna(p95_jsd) else "{:.4f}".format(float(p95_jsd))))
             target_max = pd.to_numeric(audit.get("Target JSD"), errors="coerce").max()
-            m3.metric("Largest target JSD", "N/A" if pd.isna(target_max) else "{:.4f}".format(float(target_max)))
+            m3.metric(framework_label("Largest target JSD"), framework_label("N/A" if pd.isna(target_max) else "{:.4f}".format(float(target_max))))
 
             with st.expander("JSD trend and exact window-level composition audit", expanded=False):
                 plot(distribution_shift_figure(audit), "r120_distribution_shift_trend")
-                st.dataframe(audit, use_container_width=True, hide_index=True)
-                st.dataframe(feature_audit, use_container_width=True, hide_index=True)
+                st.dataframe(display_frame(audit), use_container_width=True, hide_index=True)
+                st.dataframe(display_frame(feature_audit), use_container_width=True, hide_index=True)
 
     st.caption(
         "Fairness-specific temporal change and accumulated fairness debt remain in Advanced Labs → Fairness Lab; they are intentionally not counted as predictive drift events."
@@ -254,7 +255,7 @@ def streaming_observatory_page():
             "Mean accuracy drop": summary.get("mean_accuracy_drop"),
             "Max accuracy drop": summary.get("max_accuracy_drop"),
         })
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    st.dataframe(display_frame(pd.DataFrame(rows)), use_container_width=True, hide_index=True)
 
     st.caption(
         "Detector note: Hybrid mode combines ADWIN, Page-Hinkley and a fast-vs-slow rolling-accuracy degradation check. A bounded sustained performance drop can be confirmed when statistical detectors remain silent, with warm-up/minimum-separation protection. "
@@ -294,11 +295,11 @@ def responsible_ai_page():
     faith = load_phase8_report()
     state = ensure_research_state()
 
-    fairness_tab, overview_tab, faith_tab = st.tabs([
+    fairness_tab, overview_tab, faith_tab = st.tabs(display_labels([
         "Fairness Observatory",
         "Cross-dimension evidence",
         "Faithfulness development evidence",
-    ])
+    ]))
 
     with fairness_tab:
         if not results:
@@ -326,7 +327,7 @@ def responsible_ai_page():
                     framework_names,
                     index=default_i,
                     key="rai_v64_framework",
-                )
+                 format_func=framework_label)
                 state["rai_fairness_framework"] = selected_fw
                 selected_result = next(r for r in eligible if str(r.get("framework")) == selected_fw)
                 fair = selected_result.get("fairness") or {}
@@ -382,7 +383,7 @@ def responsible_ai_page():
                     )
 
                 with st.expander("Group support & exact disaggregated values", expanded=False):
-                    st.dataframe(group_frame, use_container_width=True, hide_index=True)
+                    st.dataframe(display_frame(group_frame), use_container_width=True, hide_index=True)
                     st.caption(
                         "Support remains auditable here and in plot hover. It is not used as marker area, so sample size cannot visually overpower the fairness quantities themselves."
                     )
@@ -400,7 +401,7 @@ def responsible_ai_page():
                     )
                     plot(fig, "rai_v64_fairness_over_time")
                 else:
-                    st.info("This run has final group evidence but no window-level fairness trajectory for the selected framework.")
+                    st.info(framework_label("This run has final group evidence but no window-level fairness trajectory for the selected framework."))
 
                 section(
                     "Fairness–performance frontier",
@@ -450,7 +451,7 @@ def responsible_ai_page():
                         rendered = f"{float(value):.2e}"
                     else:
                         rendered = f"{float(value):.3f}"
-                    col.metric(label, str(item.get("Framework") or "N/A"), rendered)
+                    col.metric(framework_label(label), framework_label(str(item.get("Framework") or "N/A")), rendered)
 
             left, right = st.columns([1.12, 0.88])
             with left:
@@ -473,11 +474,11 @@ def responsible_ai_page():
                 )
                 plot(fig, "rai_v64_cross_dimension_rank_flow")
                 st.caption(
-                    "Rank crossings show where a framework that leads one Responsible-AI dimension becomes weaker on another. Rank 1 is best within that dimension only."
+                    framework_label("Rank crossings show where a framework that leads one Responsible-AI dimension becomes weaker on another. Rank 1 is best within that dimension only.")
                 )
 
             with st.expander("Exact current-run Responsible-AI evidence", expanded=False):
-                st.dataframe(frame, use_container_width=True, hide_index=True)
+                st.dataframe(display_frame(frame), use_container_width=True, hide_index=True)
                 st.caption(
                     "Accuracy and XAI fidelity are higher-is-better; demographic-parity gap, Energy and CO₂ are lower-is-better. Missing evidence remains N/A."
                 )
@@ -506,11 +507,11 @@ def responsible_ai_page():
                 delta = None
 
             cols = st.columns(5)
-            cols[0].metric("Deterministic AEF", fmt(det_aef, 3))
-            cols[1].metric("Live Ollama AEF", fmt(live_aef, 3), None if delta is None else f"{delta:+.3f}")
-            cols[2].metric("Lowest component", str(summary.get("lowest_label") or "N/A"), fmt(summary.get("lowest_value"), 3))
-            cols[3].metric("Component spread", fmt(summary.get("spread"), 3))
-            cols[4].metric("Development datasets", str(deterministic.get("n_datasets", 0)))
+            cols[0].metric(framework_label("Deterministic AEF"), framework_label(fmt(det_aef, 3)))
+            cols[1].metric(framework_label("Live Ollama AEF"), framework_label(fmt(live_aef, 3)), None if delta is None else f"{delta:+.3f}")
+            cols[2].metric(framework_label("Lowest component"), framework_label(str(summary.get("lowest_label") or "N/A")), fmt(summary.get("lowest_value"), 3))
+            cols[3].metric(framework_label("Component spread"), framework_label(fmt(summary.get("spread"), 3)))
+            cols[4].metric(framework_label("Development datasets"), framework_label(str(deterministic.get("n_datasets", 0))))
 
             left, right = st.columns([1.12, 0.88])
             with left:

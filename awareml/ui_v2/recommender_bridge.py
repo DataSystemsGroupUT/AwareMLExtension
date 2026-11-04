@@ -16,8 +16,14 @@ TARGETS = {"accuracy": "accuracy", "runtime": "runtime_sec", "energy": "energy_k
 
 
 def bundle_directory():
-    return Path(os.environ.get("AWAREML_RECOMMENDER_V3_BUNDLE") or
-                ROOT / "artifacts/recommender_v3/primary_prefix").expanduser().resolve()
+    from .recommender_assets import asset_path, discover_local_bundle
+    explicit = os.environ.get("AWAREML_RECOMMENDER_BUNDLE") or os.environ.get("AWAREML_RECOMMENDER_V3_BUNDLE")
+    if explicit:
+        return Path(explicit).expanduser().resolve()
+    configured = asset_path("bundle")
+    if configured:
+        return configured
+    return discover_local_bundle() or (ROOT / "artifacts/dashboard_evidence/models").resolve()
 
 
 def _sha(path):
@@ -39,10 +45,14 @@ def _inside(directory, relative):
     return path
 
 
-def bundle_status(directory=None):
-    directory = Path(directory).resolve() if directory else bundle_directory()
+def bundle_status(directory=None, historical_only=False):
+    try:
+        directory = Path(directory).resolve() if directory else bundle_directory()
+    except Exception as exc:
+        return {"ready": False, "state": "invalid_bundle", "directory": "",
+                "message": "Model connection settings could not be read: " + str(exc)}
     status = {"ready": False, "state": "training_pending", "directory": str(directory),
-              "message": "Model training pending. The revised benchmark, collection and nested validation must finish before a trained bundle is available."}
+              "message": "Connect the trained model folder from your completed experiment to enable recommendations."}
     path = directory / "manifest.json"
     if not path.exists():
         return status
@@ -56,15 +66,19 @@ def bundle_status(directory=None):
         forbidden = {"n_samples_dataset", "dataset_family", "source_type", "drift_type"}
         if forbidden.intersection(manifest["features"]):
             raise ValueError("Deployment features contain full-stream or dataset metadata.")
-        trained_version = manifest["environment"]["packages"]["scikit-learn"]
-        if trained_version != importlib.metadata.version("scikit-learn"):
-            raise ValueError("Use the training scikit-learn version to load the models.")
+        if not historical_only:
+            trained_version = manifest["environment"]["packages"]["scikit-learn"]
+            if trained_version != importlib.metadata.version("scikit-learn"):
+                raise ValueError("Use the training scikit-learn version to load the models.")
         files = manifest["file_hashes"]
         required = {"development_aggregates.csv", "training_collection.json"}
-        required.update(entry["file"] for entry in manifest["models"].values())
+        if not historical_only:
+            required.update(entry["file"] for entry in manifest["models"].values())
         if not required.issubset(files) or set(manifest["models"]) != set(OBJECTIVES):
             raise ValueError("Training evidence or objective models are incomplete.")
         for name, expected in files.items():
+            if historical_only and name not in required:
+                continue
             if _sha(_inside(directory, name)) != expected:
                 raise ValueError("Artifact changed: " + name)
         collection = json.loads((directory / "training_collection.json").read_text(encoding="utf-8"))
@@ -83,6 +97,8 @@ def bundle_status(directory=None):
         frameworks = list(manifest["frameworks"])
         if not frameworks or len(set(frameworks)) != len(frameworks):
             raise ValueError("Invalid framework portfolio.")
+        if set(frameworks) != {"AutoStreamML", "AutoClass", "EvoAutoML", "OAML", "ChaCha"}:
+            raise ValueError("Connect the complete five-framework model portfolio.")
         import pandas as pd
         frame = pd.read_csv(directory / "development_aggregates.csv")
         ids = set(map(str, manifest["training_dataset_ids"]))
@@ -98,12 +114,24 @@ def bundle_status(directory=None):
                 raise ValueError("Invalid development objective outcomes.")
         if (frame.accuracy_mean > 1).any() or (frame.energy_kwh_mean <= 0).any():
             raise ValueError("Invalid development accuracy or energy.")
-        return {**status, "ready": True, "state": "ready", "message": "Validated prefix-only model bundle available.",
+        return {**status, "ready": True, "state": "history_ready" if historical_only else "ready", "message": "Validated development results available." if historical_only else "Validated prefix-only model bundle available.",
                 "evidence_id": _sha(path), "manifest": manifest, "development_datasets": len(ids),
                 "training_rows": len(frame), "underlying_runs": int(frame.seed_count.sum()),
                 "framework_count": len(frameworks), "seeds": list(protocol["seeds"])}
     except Exception as exc:
         return {**status, "state": "invalid_bundle", "message": "Model bundle unavailable: " + str(exc)}
+
+
+def historical_status(directory=None):
+    """Validate actual development aggregates without loading or requiring model binaries."""
+    return bundle_status(directory, historical_only=True)
+
+
+def require_history(directory=None):
+    status = historical_status(directory)
+    if not status['ready']:
+        raise RuntimeError(status['message'])
+    return status
 
 
 def require_bundle(directory=None):
@@ -139,7 +167,7 @@ def normalize_weights(weights=None):
 
 def historical_prior(weights, directory=None):
     """Mean within-dataset utility of seed-aggregated DEVELOPMENT outcomes."""
-    status = require_bundle(directory)
+    status = require_history(directory)
     import numpy as np
     import pandas as pd
     from awareml.protocol_v3.common import utilities
@@ -148,31 +176,52 @@ def historical_prior(weights, directory=None):
     frameworks = status["manifest"]["frameworks"]
     scores = {f: [] for f in frameworks}
     wins = dict.fromkeys(frameworks, 0)
+    top3 = dict.fromkeys(frameworks, 0)
     for _, part in frame.groupby("dataset_id", sort=True):
         part = part.set_index("framework").loc[frameworks]
         values = part[[TARGETS[k] + "_mean" for k in OBJECTIVES]].to_numpy(dtype=float)
         utility = utilities(values, weights)
+        order = np.argsort(-utility, kind='stable')[:3]
         for index, framework in enumerate(frameworks):
             scores[framework].append(float(utility[index]))
             wins[framework] += int(abs(float(utility[index] - utility.max())) <= 1e-12)
+            top3[framework] += int(index in order)
     ranked = pd.DataFrame([{"framework": f, "historical_utility": float(np.mean(scores[f])),
                             "utility_std_across_datasets": float(np.std(scores[f], ddof=1)) if len(scores[f]) > 1 else None,
-                            "win_count": wins[f], "support_datasets": len(scores[f])} for f in frameworks])
+                            "win_count": wins[f], "support_datasets": len(scores[f]),
+                            "win_rate": wins[f] / len(scores[f]), "top3_rate": top3[f] / len(scores[f]),
+                            "utility_iqr": float(np.quantile(scores[f], .75) - np.quantile(scores[f], .25)),
+                            **{key + '_median': float(frame.loc[frame.framework == f, target + '_mean'].median())
+                               for key, target in TARGETS.items()}} for f in frameworks])
     ranked = ranked.sort_values("historical_utility", ascending=False, kind="stable").reset_index(drop=True)
     ranked["rank"] = range(1, len(ranked) + 1)
-    ranked["framework_label"] = ranked.framework.replace({"ChaCha": "ChaCha-OVR (supplementary adaptation)"})
+    ranked["framework_label"] = ranked.framework.replace({"ChaCha": "ChaCha-OVR"})
     return ranked, status
 
 
-def evaluation_evidence(kind, directory=None):
+def evaluation_evidence(kind, directory=None, evaluation_directory=None):
     """Only display evaluations explicitly linked to this exact trained bundle."""
     if kind not in ("development", "external"):
         raise ValueError("Unknown evaluation role.")
-    status = require_bundle(directory)
+    status = require_history(directory)
     bundle = Path(status["directory"])
     variable = "AWAREML_V3_" + kind.upper() + "_EVALUATION"
     default = bundle.parent / (bundle.name + "_" + kind + "_evaluation")
-    path = Path(os.environ.get(variable) or default).resolve()
+    from .recommender_assets import asset_path
+    configured = asset_path(kind) if evaluation_directory is None else None
+    path = Path(evaluation_directory or os.environ.get(variable) or configured or default).resolve()
+    if evaluation_directory is None and not os.environ.get(variable) and configured is None and not (path / 'evaluation.json').exists():
+        roles={'development':'nested_LODO_development_four_predeclared_profiles',
+               'external':'revised_external_evaluation_of_previously_evaluated_cohort'}
+        matches=[]
+        if (ROOT/'artifacts').exists():
+            for candidate in (ROOT/'artifacts').rglob('evaluation.json'):
+                if 'copilot_ui_backups' in candidate.parts:continue
+                try:
+                    record=json.loads(candidate.read_text(encoding='utf-8'))
+                    if record.get('bundle_manifest_sha256')==status['evidence_id'] and record.get('portfolio')==status['manifest']['portfolio'] and record.get('role')==roles[kind]:matches.append(candidate)
+                except (OSError,ValueError,TypeError):continue
+        if matches:path=max(matches,key=lambda p:p.stat().st_mtime).parent.resolve()
     if not (path / "evaluation.json").exists():
         return None
     data = json.loads((path / "evaluation.json").read_text(encoding="utf-8"))
@@ -203,7 +252,8 @@ def sync_copilot_evidence(state, status=None):
             state["copilot_context_free_interpretation"] = data["interpretation"]
             state["copilot_context_free_meta"] = {"goal_parse": (state.get("copilot_meta") or {}).get("goal_parse", {})}
         for key in ("copilot_proposal", "copilot_ranked", "copilot_evidence", "copilot_meta", "copilot_review",
-                    "copilot_auto_historical_result", "copilot_auto_historical_ranking", "copilot_prefix_profile"):
+                    "copilot_auto_historical_result", "copilot_auto_historical_ranking", "copilot_prefix_profile",
+                    "current_dataset_result", "current_historical_result"):
             state.pop(key, None)
         state["copilot_current_evidence_id"] = token
     return status
@@ -250,3 +300,4 @@ def apply_current_objective_override(state, corrected):
     state["copilot_meta"] = {**(state.get("copilot_meta") or {}), "ranking": meta,
                               "human_objective_override": {"selected_objectives": selected, "weights": weights}}
     return new.ml_recommender_framework
+

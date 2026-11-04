@@ -9,12 +9,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from awareml.protocol_v3.common import NUMERIC_FEATURES, OBJECTIVES, PRIMARY, TARGETS, digest, sha256
+from awareml.protocol_v3.common import NUMERIC_FEATURES, OBJECTIVES, PRIMARY, FRAMEWORKS, TARGETS, digest, sha256
 from awareml.protocol_v3.models import FrameworkMean, feature_columns
 from awareml.ui_v2 import recommender_bridge as bridge
 
 
-def make_bundle(path, frameworks=PRIMARY, cohort="dev"):
+def make_bundle(path, frameworks=FRAMEWORKS, cohort="dev"):
     path.mkdir()
     rows = []
     for dataset in range(3):
@@ -73,8 +73,8 @@ def test_pending_has_no_invented_training_or_external_counts(tmp_path):
 def test_counts_come_from_active_portfolio_and_real_seed_aggregates(bundle):
     status = bridge.bundle_status()
     assert status["ready"]
-    assert (status["development_datasets"], status["training_rows"], status["underlying_runs"]) == (3, 12, 60)
-    assert status["framework_count"] == 4
+    assert (status["development_datasets"], status["training_rows"], status["underlying_runs"]) == (3, 15, 75)
+    assert status["framework_count"] == 5
     assert bridge.evaluation_evidence("external") is None
 
 
@@ -88,7 +88,7 @@ def test_extended_counts_and_chacha_label_are_explicit(tmp_path):
 def test_historical_prior_uses_development_aggregates_and_active_weights(bundle):
     accuracy, _ = bridge.historical_prior({"accuracy": 1})
     runtime, _ = bridge.historical_prior({"runtime": 1})
-    assert accuracy.iloc[0].framework == PRIMARY[-1]
+    assert accuracy.iloc[0].framework == FRAMEWORKS[-1]
     assert runtime.iloc[0].framework == PRIMARY[0]
     assert set(accuracy.support_datasets) == {3}
 
@@ -176,7 +176,7 @@ def test_copilot_proposal_and_human_correction_use_prefix_models(bundle, monkeyp
     state = {"dataset": frame(), "target": "target"}
     proposal, ranked, evidence, meta = bridge.propose_current(service, state, "accurate", False)
     state.update(copilot_proposal=proposal, copilot_ranked=ranked, copilot_meta=meta)
-    assert proposal.ml_recommender_framework == PRIMARY[-1]
+    assert proposal.ml_recommender_framework == FRAMEWORKS[-1]
     winner = bridge.apply_current_objective_override(state, ["Runtime"])
     assert winner == PRIMARY[0]
     assert state["copilot_proposal"].interpretation.primary_weights.runtime == 1
@@ -211,7 +211,7 @@ def test_streamlit_pending_copilot_and_dataset_tabs(tmp_path, monkeypatch):
     assert not app.exception
     app.button(key="copilot_workspace_open_dataset").click().run()
     assert not app.exception
-    assert any("pending" in item.value.lower() for item in app.info)
+    assert any("not available" in item.value.lower() for item in app.info)
     assert not any(item.value == "705" for item in app.metric)
     app.button(key="copilot_workspace_open_historical").click().run()
     assert not app.exception
@@ -224,9 +224,10 @@ def test_streamlit_trained_dataset_panel_reports_real_counts(bundle):
     app.session_state["awareml_state"] = {"dataset": frame(), "target": "target", "dataset_name": "test fixture"}
     app.run(timeout=30)
     assert not app.exception
-    assert app.metric[0].value == "3" and app.metric[1].value == "12"
-    assert app.metric[2].value == "60" and app.metric[3].value == "5"
-    assert app.dataframe[0].value.shape[0] == 4
+    assert app.metric[0].value == "3" and app.metric[1].value == "15"
+    assert app.metric[2].value == "75" and app.metric[3].value == "—"
+    app.button(key="three_dataset_run").click().run()
+    assert app.dataframe[0].value.shape[0] == 5
 
 
 def test_goal_interpretation_remains_usable_while_training_is_pending(tmp_path, monkeypatch):
@@ -256,5 +257,6 @@ def test_trained_copilot_uses_current_prefix_bundle_end_to_end(bundle):
     state = app.session_state["awareml_state"]
     assert state.get("copilot_proposal") is not None
     assert state["copilot_meta"]["ranking"]["recommender_version"] == "v3"
-    assert len(state["copilot_ranked"]) == 4
+    assert len(state["copilot_ranked"]) == 5
     assert state["copilot_prefix_profile"]["profile_sample_size"] == 1000
+

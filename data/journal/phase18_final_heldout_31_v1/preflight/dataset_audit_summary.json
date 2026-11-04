@@ -1,0 +1,302 @@
+{
+  "schema_version": "2.5",
+  "rows": 31,
+  "status_counts": {
+    "PASS_DERIVED": 16,
+    "PASS": 15
+  },
+  "role_counts": {
+    "primary_heldout_derived_classification": 16,
+    "primary_heldout_native_classification": 15
+  },
+  "primary_heldout_eligible": 31,
+  "primary_heldout_not_eligible": 0,
+  "development_overlap_count": 0,
+  "development_overlaps": [],
+  "cohorts": {
+    "historical_23": 23,
+    "extension_8": 8
+  },
+  "unresolved_dataset_ids": [],
+  "targets": [
+    {
+      "dataset_id": "abalone_Real",
+      "resolved_target": "target",
+      "target_unique": 5,
+      "task_assessment": "classification",
+      "preflight_status": "PASS_DERIVED",
+      "evaluation_role": "primary_heldout_derived_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "ailerons_Synthetic",
+      "resolved_target": "target",
+      "target_unique": 5,
+      "task_assessment": "classification",
+      "preflight_status": "PASS_DERIVED",
+      "evaluation_role": "primary_heldout_derived_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "bike_Real",
+      "resolved_target": "cnt",
+      "target_unique": 5,
+      "task_assessment": "classification",
+      "preflight_status": "PASS_DERIVED",
+      "evaluation_role": "primary_heldout_derived_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "cpu_activity_Real",
+      "resolved_target": "usr",
+      "target_unique": 5,
+      "task_assessment": "classification",
+      "preflight_status": "PASS_DERIVED",
+      "evaluation_role": "primary_heldout_derived_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "diamonds_Real",
+      "resolved_target": "price",
+      "target_unique": 5,
+      "task_assessment": "classification",
+      "preflight_status": "PASS_DERIVED",
+      "evaluation_role": "primary_heldout_derived_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "elevators_Synthetic",
+      "resolved_target": "target",
+      "target_unique": 5,
+      "task_assessment": "classification",
+      "preflight_status": "PASS_DERIVED",
+      "evaluation_role": "primary_heldout_derived_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "fried_Synthetic",
+      "resolved_target": "target",
+      "target_unique": 5,
+      "task_assessment": "classification",
+      "preflight_status": "PASS_DERIVED",
+      "evaluation_role": "primary_heldout_derived_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "FriedmanGra_Synthetic",
+      "resolved_target": "target",
+      "target_unique": 5,
+      "task_assessment": "classification",
+      "preflight_status": "PASS_DERIVED",
+      "evaluation_role": "primary_heldout_derived_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "FriedmanLea_Synthetic",
+      "resolved_target": "target",
+      "target_unique": 5,
+      "task_assessment": "classification",
+      "preflight_status": "PASS_DERIVED",
+      "evaluation_role": "primary_heldout_derived_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "health_insurance_Real",
+      "resolved_target": "whrswk",
+      "target_unique": 4,
+      "task_assessment": "classification",
+      "preflight_status": "PASS_DERIVED",
+      "evaluation_role": "primary_heldout_derived_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "House8L_Real",
+      "resolved_target": "target",
+      "target_unique": 5,
+      "task_assessment": "classification",
+      "preflight_status": "PASS_DERIVED",
+      "evaluation_role": "primary_heldout_derived_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "hyperA_Synthetic",
+      "resolved_target": "target",
+      "target_unique": 5,
+      "task_assessment": "classification",
+      "preflight_status": "PASS_DERIVED",
+      "evaluation_role": "primary_heldout_derived_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "kin8nm_Real",
+      "resolved_target": "y",
+      "target_unique": 5,
+      "task_assessment": "classification",
+      "preflight_status": "PASS_DERIVED",
+      "evaluation_role": "primary_heldout_derived_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "MetroTraffic_Real",
+      "resolved_target": "target",
+      "target_unique": 5,
+      "task_assessment": "classification",
+      "preflight_status": "PASS_DERIVED",
+      "evaluation_role": "primary_heldout_derived_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "nomao_Real",
+      "resolved_target": "Class",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_native_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "physiochemical_protein_Real",
+      "resolved_target": "RMSD",
+      "target_unique": 5,
+      "task_assessment": "classification",
+      "preflight_status": "PASS_DERIVED",
+      "evaluation_role": "primary_heldout_derived_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "RBFm_100k_Synthetic",
+      "resolved_target": "class",
+      "target_unique": 5,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_native_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "RTG_2abrupt_Synthetic",
+      "resolved_target": "class",
+      "target_unique": 5,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_native_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "sarcos_Real",
+      "resolved_target": "V22",
+      "target_unique": 5,
+      "task_assessment": "classification",
+      "preflight_status": "PASS_DERIVED",
+      "evaluation_role": "primary_heldout_derived_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "SEA_Abrubt_5_Synthetic",
+      "resolved_target": "class",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_native_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "SEA_Mixed_5_Synthetic",
+      "resolved_target": "class",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_native_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "SINE_Abrupt_Synthetic",
+      "resolved_target": "class",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_native_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "white_wine_Real",
+      "resolved_target": "quality",
+      "target_unique": 7,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_native_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "bank_stream",
+      "resolved_target": "age_group",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_native_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "census_income_stream",
+      "resolved_target": "income_binary",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_native_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "credit_card_stream",
+      "resolved_target": "age_group",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_native_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "dutch_census_stream_awareml",
+      "resolved_target": "occupation_binary",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_native_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "german_credit_stream_80_20",
+      "resolved_target": "risk",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_native_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "insurance_stream",
+      "resolved_target": "charges_high",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_native_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "law_dataset_stream",
+      "resolved_target": "race_group",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_native_classification",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "StudentsPerformance_stream",
+      "resolved_target": "performance_high",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_native_classification",
+      "primary_heldout_eligible": true
+    }
+  ]
+}

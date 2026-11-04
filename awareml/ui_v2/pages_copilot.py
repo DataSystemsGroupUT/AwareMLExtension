@@ -1,4 +1,5 @@
 from __future__ import annotations
+from awareml.ui_v2.framework_labels import framework_label, framework_description, display_labels, display_frame, display_figure
 
 import streamlit as st
 
@@ -152,7 +153,7 @@ def _render_objective_interpretation(interpretation, parse_meta, state):
     decisions = dict(evidence_audit.get("decisions") or {})
     if decisions:
         st.markdown("**Hybrid evidence-grounded V3.3 selection audit**")
-        st.dataframe(v33_audit_rows(evidence_audit), use_container_width=True, hide_index=True)
+        st.dataframe(display_frame(v33_audit_rows(evidence_audit)), use_container_width=True, hide_index=True)
         recovered = list(evidence_audit.get("semantic_recovered_objectives") or [])
         if recovered:
             st.info(
@@ -168,13 +169,13 @@ def _render_objective_interpretation(interpretation, parse_meta, state):
     c1, c2, c3, c4 = st.columns(4)
     weights = interpretation.get("primary_weights") or {}
     with c1:
-        st.metric("Accuracy weight", fmt(weights.get("accuracy"), 3))
+        st.metric(framework_label("Accuracy weight"), framework_label(fmt(weights.get("accuracy"), 3)))
     with c2:
-        st.metric("Runtime weight", fmt(weights.get("runtime"), 3))
+        st.metric(framework_label("Runtime weight"), framework_label(fmt(weights.get("runtime"), 3)))
     with c3:
-        st.metric("Energy weight", fmt(weights.get("energy"), 3))
+        st.metric(framework_label("Energy weight"), framework_label(fmt(weights.get("energy"), 3)))
     with c4:
-        st.metric("CO2 weight", fmt(weights.get("co2"), 3))
+        st.metric(framework_label("CO2 weight"), framework_label(fmt(weights.get("co2"), 3)))
 
     st.info(_weighting_explanation(selected))
 
@@ -203,8 +204,8 @@ def _render_objective_interpretation(interpretation, parse_meta, state):
             language="text",
         )
         st.caption(
-            "These numbers do not come from the uploaded dataset or from a completed "
-            "framework run. They are produced only by the frozen weighting policy."
+            framework_label("These numbers do not come from the uploaded dataset or from a completed "
+            "framework run. They are produced only by the frozen weighting policy.")
         )
 
     st.caption(
@@ -305,18 +306,18 @@ def _render_framework_placeholder(has_dataset):
     cols = st.columns(4)
     with cols[0]:
         st.metric(
-            "Pre-run predicted framework",
-            "Awaiting dataset for V2" if not has_dataset else "Generate proposal",
+            framework_label("Pre-run predicted framework"),
+            framework_label("Awaiting dataset for V2" if not has_dataset else "Generate proposal"),
         )
     with cols[1]:
-        st.metric("Predicted ML rank", "—")
+        st.metric(framework_label("Predicted ML rank"), framework_label("—"))
     with cols[2]:
-        st.metric("Normalized preference utility", "—")
+        st.metric(framework_label("Normalized preference utility"), framework_label("—"))
     with cols[3]:
-        st.metric("Review state", "OBJECTIVE READY")
+        st.metric(framework_label("Review state"), framework_label("OBJECTIVE READY"))
 
     st.markdown(
-        """
+        framework_label("""
         <div class="r9-callout">
           <b>Goal Copilot does not fabricate a dataset-specific framework in context-free mode.</b><br>
           The five frameworks have dataset-dependent behaviour, so AwareML waits
@@ -326,19 +327,19 @@ def _render_framework_placeholder(has_dataset):
           <b>You do not need to run the benchmark first for V2.</b> Loading a dataset and
           choosing its target is enough to obtain the pre-run prediction.
         </div>
-        """,
+        """),
         unsafe_allow_html=True,
     )
 
     with st.expander("What becomes available after a dataset is loaded?"):
         st.markdown(
-            """
+            framework_label("""
             - pre-run predicted framework and ML rank;
             - predicted utility under the selected objective weights;
             - framework-specific proposed configuration;
             - grounded recommendation rationale and technical evidence IDs;
             - full configuration approval / approve-with-edits / reject workflow.
-            """
+            """)
         )
 
 
@@ -359,7 +360,7 @@ def _goal_copilot_workspace_page():
     )
 
     st.markdown(
-        """
+        framework_label("""
         <div class="r9-callout">
           <b>Objective-selection architecture:</b><br>
           Scenario → <b>selected objective set</b> → <b>equal-selected weighting</b>
@@ -369,7 +370,7 @@ def _goal_copilot_workspace_page():
           The LLM does <b>not</b> directly choose AutoClass, OAML, ChaCha,
           AutoStreamML or EvoAutoML.
         </div>
-        """,
+        """),
         unsafe_allow_html=True,
     )
 
@@ -476,8 +477,8 @@ def _goal_copilot_workspace_page():
                     state["copilot_context_free_interpretation"] = interpretation
                     state["copilot_context_free_meta"] = meta
                     st.success(
-                        "Objective proposal generated without dataset context. "
-                        "Load a dataset later only if you want a framework ranking."
+                        framework_label("Objective proposal generated without dataset context. "
+                        "Load a dataset later only if you want a framework ranking.")
                     )
             except Exception as exc:
                 error_name = type(exc).__name__
@@ -524,7 +525,7 @@ def _goal_copilot_workspace_page():
             st.warning(journal_status["error"])
 
         st.markdown(
-            """
+            framework_label("""
             <div class="r9-callout" style="margin-top:14px">
               <b>Problem A:</b> Which objectives does the scenario imply?<br>
               <b>Problem B:</b> How are those selected objectives weighted?<br>
@@ -532,28 +533,28 @@ def _goal_copilot_workspace_page():
               A and B are context-free. C requires dataset meta-features because
               framework performance depends on the data.
             </div>
-            """,
+            """),
             unsafe_allow_html=True,
         )
 
     if not has_dataset:
         st.info(
-            "Goal Copilot context-free mode: objective interpretation and weighting are available now. "
+            framework_label("Goal Copilot context-free mode: objective interpretation and weighting are available now. "
             "The dataset-aware ML Recommender V2 prediction remains pending until a dataset profile exists. "
-            "For a dataset-free framework starting point, open the Historical Meta-Recommender tab."
+            "For a dataset-free framework starting point, open the Historical Meta-Recommender tab.")
         )
     elif not has_observed_run:
         st.info(
-            "Pre-run recommendation mode: a dataset is uploaded, but no framework "
+            framework_label("Pre-run recommendation mode: a dataset is uploaded, but no framework "
             "benchmark has been executed yet. Objective weights come from the "
             "scenario; framework performance is predicted by frozen ML Recommender "
-            "V2 from the uploaded dataset's meta-profile. These are not observed results."
+            "V2 from the uploaded dataset's meta-profile. These are not observed results.")
         )
     else:
         st.info(
-            "Dataset-aware pre-run mode: Copilot still uses the scenario plus the "
+            framework_label("Dataset-aware pre-run mode: Copilot still uses the scenario plus the "
             "dataset meta-profile for framework ranking. Already-observed benchmark "
-            "results are separate evidence in Streaming Observatory / Decision Lab."
+            "results are separate evidence in Streaming Observatory / Decision Lab.")
         )
 
     if render_copilot_clarification(state):
@@ -604,18 +605,18 @@ def _goal_copilot_workspace_page():
     cols = st.columns(4)
     with cols[0]:
         st.metric(
-            "Pre-run predicted framework",
-            str(proposal_dict.get("ml_recommender_framework")),
+            framework_label("Pre-run predicted framework"),
+            framework_label(str(proposal_dict.get("ml_recommender_framework"))),
         )
     with cols[1]:
         st.metric(
-            "Predicted ML rank",
-            "#{}".format(proposal_dict.get("ml_recommender_rank", 1)),
+            framework_label("Predicted ML rank"),
+            framework_label("#{}".format(proposal_dict.get("ml_recommender_rank", 1))),
         )
     with cols[2]:
         st.metric(
-            "Predicted utility",
-            fmt(proposal_dict.get("ml_recommender_utility"), 4),
+            framework_label("Predicted utility"),
+            framework_label(fmt(proposal_dict.get("ml_recommender_utility"), 4)),
         )
     with cols[3]:
         review_state = state.get("copilot_review")
@@ -624,7 +625,7 @@ def _goal_copilot_workspace_page():
             if isinstance(review_state, dict)
             else "PROPOSED"
         )
-        st.metric("Review state", decision or "PROPOSED")
+        st.metric(framework_label("Review state"), framework_label(decision or "PROPOSED"))
 
     if not has_observed_run:
         st.warning(
@@ -632,7 +633,7 @@ def _goal_copilot_workspace_page():
             "from ML Recommender V2, not measured outcomes from the uploaded dataset."
         )
 
-    st.markdown("**Why this framework?**")
+    st.markdown(framework_label("**Why this framework?**"))
     st.write(humanize_rationale_text(clean_pre_run_rationale(proposal_dict.get("rationale"))))
     evidence_chips(proposal_dict.get("evidence_keys"), show_raw=True)
 
@@ -723,9 +724,11 @@ def _render_objective_interpretation(interpretation, parse_meta, state):
 
 # PRE14_THREE_PATH_COPILOT_WRAPPER
 def copilot_workspace_page():
-    state = ensure_research_state()
-    active_path = render_copilot_workspace_header(state)
-
+    from .state import ensure_research_state
+    from .copilot_workspace_v5 import render_copilot_workspace_header
+    from .copilot_recommender import render_historical_preference_prior_tab, render_dataset_aware_tab
+    from .copilot_unified import render_goal_copilot_unified_page
+    active_path = render_copilot_workspace_header(ensure_research_state())
     if active_path == "historical":
         render_historical_preference_prior_tab()
     elif active_path == "dataset":
