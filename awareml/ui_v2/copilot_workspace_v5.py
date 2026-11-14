@@ -72,7 +72,7 @@ def render_copilot_workspace_header(state):
         if not has_dataset:
             dataset_status += " · Dataset + target required"
 
-    hero("HUMAN-CENTRED DECISION SUPPORT", "AwareML Copilot Workspace",
+    hero("HUMAN-CENTRED DECISION SUPPORT", "Goal and Recommendation Panel",
          "Interpret your deployment goal, compare historical evidence and generate a dataset-aware framework recommendation.",
          [("Goal interpretation", "good"),
           ("Historical evidence available" if history['ready'] else "Historical evidence required", "good" if history['ready'] else "warn"),

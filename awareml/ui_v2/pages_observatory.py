@@ -202,7 +202,7 @@ def streaming_observatory_page():
                 st.dataframe(display_frame(feature_audit), use_container_width=True, hide_index=True)
 
     st.caption(
-        "Fairness-specific temporal change and accumulated fairness debt remain in Advanced Labs → Fairness Lab; they are intentionally not counted as predictive drift events."
+        "Fairness-specific temporal change and accumulated fairness debt are available in Responsible AI → Fairness Lab; they are intentionally not counted as predictive drift events."
     )
 
     plot_results = prepare_drift_display(results)
@@ -296,141 +296,148 @@ def responsible_ai_page():
     state = ensure_research_state()
 
     fairness_tab, overview_tab, faith_tab = st.tabs(display_labels([
-        "Fairness Observatory",
+        "Fairness Lab",
         "Cross-dimension evidence",
         "Faithfulness development evidence",
     ]))
 
     with fairness_tab:
-        if not results:
-            empty_state(
-                "Current-run fairness evidence unavailable",
-                "Run an experiment with a sensitive attribute to populate group-level fairness evidence.",
-            )
-        else:
-            eligible = [
-                r for r in results
-                if isinstance((r.get("fairness") or {}).get("group_performance"), dict)
-                and (r.get("fairness") or {}).get("group_performance")
-            ]
-            if not eligible:
+        from .pages_specialist import fairness_v2_page
+
+        fairness_v2_page()
+        if st.checkbox(
+            "Show additional group-level fairness diagnostics",
+            key="rai_show_group_diagnostics",
+        ):
+            if not results:
                 empty_state(
-                    "Group-level fairness evidence unavailable",
-                    "The active run does not contain at least two supported sensitive groups. Re-run with a sensitive attribute and sufficient group support.",
+                    "Current-run fairness evidence unavailable",
+                    "Run an experiment with a sensitive attribute to populate group-level fairness evidence.",
                 )
             else:
-                framework_names = [str(r.get("framework")) for r in eligible]
-                remembered_fw = state.get("rai_fairness_framework")
-                default_i = framework_names.index(remembered_fw) if remembered_fw in framework_names else 0
-                selected_fw = st.selectbox(
-                    "Framework for disaggregated fairness audit",
-                    framework_names,
-                    index=default_i,
-                    key="rai_v64_framework",
-                 format_func=framework_label)
-                state["rai_fairness_framework"] = selected_fw
-                selected_result = next(r for r in eligible if str(r.get("framework")) == selected_fw)
-                fair = selected_result.get("fairness") or {}
-                group_frame = fairness_group_frame(fair)
-                groups = group_frame["Group"].astype(str).tolist() if not group_frame.empty else []
+                eligible = [
+                    r for r in results
+                    if isinstance((r.get("fairness") or {}).get("group_performance"), dict)
+                    and (r.get("fairness") or {}).get("group_performance")
+                ]
+                if not eligible:
+                    empty_state(
+                        "Group-level fairness evidence unavailable",
+                        "The active run does not contain at least two supported sensitive groups. Re-run with a sensitive attribute and sufficient group support.",
+                    )
+                else:
+                    framework_names = [str(r.get("framework")) for r in eligible]
+                    remembered_fw = state.get("rai_fairness_framework")
+                    default_i = framework_names.index(remembered_fw) if remembered_fw in framework_names else 0
+                    selected_fw = st.selectbox(
+                        "Framework for disaggregated fairness audit",
+                        framework_names,
+                        index=default_i,
+                        key="rai_v64_framework",
+                     format_func=framework_label)
+                    state["rai_fairness_framework"] = selected_fw
+                    selected_result = next(r for r in eligible if str(r.get("framework")) == selected_fw)
+                    fair = selected_result.get("fairness") or {}
+                    group_frame = fairness_group_frame(fair)
+                    groups = group_frame["Group"].astype(str).tolist() if not group_frame.empty else []
 
-                st.markdown(
-                    """
-                    <div class="r9-callout">
-                      <b>Disaggregated fairness first.</b> Exact group values are shown by position, not box area or a single fairness score. Benefit metrics and error metrics remain separate so reviewers can see where disparity comes from.
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+                    st.markdown(
+                        """
+                        <div class="r9-callout">
+                          <b>Disaggregated fairness first.</b> Exact group values are shown by position, not box area or a single fairness score. Benefit metrics and error metrics remain separate so reviewers can see where disparity comes from.
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
 
-                section(
-                    "Group × metric fairness profile",
-                    "Six aligned small multiples replace the previous square matrix. Each dot is one observed group value on the same 0–1 axis; the shaded span is the observed between-group range for that metric.",
-                )
-                fig = group_metric_profile_figure(fair)
-                apply_research_layout(
-                    fig, height=620, legend="bottom",
-                    title=f"{selected_fw} · disaggregated group evidence",
-                    bottom_margin=104,
-                )
-                plot(fig, "rai_v64_group_metric_profile")
-                st.caption(
-                    "Position carries the quantitative value. Group support is kept in hover and the exact table rather than occupying a separate dashboard control. Selection rate is descriptive (↔); it is not automatically higher- or lower-is-better."
-                )
-
-                left, right = st.columns([1.05, 0.95])
-                with left:
-                    fig = fairness_disparity_structure_figure(fair)
+                    section(
+                        "Group × metric fairness profile",
+                        "Six aligned small multiples replace the previous square matrix. Each dot is one observed group value on the same 0–1 axis; the shaded span is the observed between-group range for that metric.",
+                    )
+                    fig = group_metric_profile_figure(fair)
                     apply_research_layout(
-                        fig, height=410, legend="none",
-                        title="Disparity structure across group metrics",
-                        bottom_margin=66,
-                    )
-                    plot(fig, "rai_v64_disparity_structure")
-                    st.caption(
-                        "Each endpoint is the observed max–min group range. Smaller gaps mean closer parity, but parity alone does not establish good predictive performance."
-                    )
-                with right:
-                    fig = fairness_tpr_fpr_plane(fair)
-                    apply_research_layout(
-                        fig, height=410, legend="none",
-                        title="Group operating points · TPR vs FPR",
-                        bottom_margin=66,
-                    )
-                    plot(fig, "rai_v64_tpr_fpr")
-                    st.caption(
-                        "This is one observed operating point per supported group, not a threshold-sweep ROC curve. Upper-left combines higher TPR with lower FPR."
-                    )
-
-                with st.expander("Group support & exact disaggregated values", expanded=False):
-                    st.dataframe(display_frame(group_frame), use_container_width=True, hide_index=True)
-                    st.caption(
-                        "Support remains auditable here and in plot hover. It is not used as marker area, so sample size cannot visually overpower the fairness quantities themselves."
-                    )
-
-                section(
-                    "Fairness over time",
-                    "Track whether disparity changes as the stream evolves. Predictive-change markers are shown only as temporal reference points and are not relabelled as fairness drift.",
-                )
-                fig = fairness_over_time_figure(selected_result)
-                if fig.data:
-                    apply_research_layout(
-                        fig, height=470, legend="bottom",
-                        title=f"{selected_fw} · fairness gaps across stream windows",
+                        fig, height=620, legend="bottom",
+                        title=f"{selected_fw} · disaggregated group evidence",
                         bottom_margin=104,
                     )
-                    plot(fig, "rai_v64_fairness_over_time")
-                else:
-                    st.info(framework_label("This run has final group evidence but no window-level fairness trajectory for the selected framework."))
-
-                section(
-                    "Fairness–performance frontier",
-                    "Compare prequential accuracy against demographic-parity disparity across frameworks without reducing both objectives to one score.",
-                )
-                fig = fairness_performance_frontier(results, "dp_diff")
-                if fig.data:
-                    apply_research_layout(
-                        fig, height=460, legend="none",
-                        title="Accuracy–fairness frontier · demographic parity gap",
-                        bottom_margin=62,
-                    )
-                    plot(fig, "rai_v64_fairness_performance_frontier")
+                    plot(fig, "rai_v64_group_metric_profile")
                     st.caption(
-                        "Outlined diamonds are nondominated for higher Accuracy and lower demographic-parity gap. This is an exploratory two-objective frontier, not a claim that demographic parity is the only fairness definition."
+                        "Position carries the quantitative value. Group support is kept in hover and the exact table rather than occupying a separate dashboard control. Selection rate is descriptive (↔); it is not automatically higher- or lower-is-better."
                     )
 
-                with st.expander("Intersectional and threshold-sensitivity readiness", expanded=False):
-                    if len(groups) > 2:
-                        st.success(
-                            "The selected sensitive attribute contains {} supported group labels, so the view already exposes multi-group disparities. If those labels encode intersections, interpret them intersectionally only with matching dataset provenance.".format(len(groups))
+                    left, right = st.columns([1.05, 0.95])
+                    with left:
+                        fig = fairness_disparity_structure_figure(fair)
+                        apply_research_layout(
+                            fig, height=410, legend="none",
+                            title="Disparity structure across group metrics",
+                            bottom_margin=66,
                         )
-                    else:
-                        st.info(
-                            "The active run exposes {} supported group label(s) for one sensitive attribute. A genuine intersectional audit requires explicitly encoded intersectional groups or multiple protected attributes; AwareML does not invent them.".format(len(groups))
+                        plot(fig, "rai_v64_disparity_structure")
+                        st.caption(
+                            "Each endpoint is the observed max–min group range. Smaller gaps mean closer parity, but parity alone does not establish good predictive performance."
                         )
-                    st.info(
-                        "Fairness-threshold sensitivity requires stored group-level probability/label samples across thresholds. The current benchmark keeps aggregate calibration evidence, so no synthetic threshold curve is drawn."
+                    with right:
+                        fig = fairness_tpr_fpr_plane(fair)
+                        apply_research_layout(
+                            fig, height=410, legend="none",
+                            title="Group operating points · TPR vs FPR",
+                            bottom_margin=66,
+                        )
+                        plot(fig, "rai_v64_tpr_fpr")
+                        st.caption(
+                            "This is one observed operating point per supported group, not a threshold-sweep ROC curve. Upper-left combines higher TPR with lower FPR."
+                        )
+
+                    with st.expander("Group support & exact disaggregated values", expanded=False):
+                        st.dataframe(display_frame(group_frame), use_container_width=True, hide_index=True)
+                        st.caption(
+                            "Support remains auditable here and in plot hover. It is not used as marker area, so sample size cannot visually overpower the fairness quantities themselves."
+                        )
+
+                    section(
+                        "Fairness over time",
+                        "Track whether disparity changes as the stream evolves. Predictive-change markers are shown only as temporal reference points and are not relabelled as fairness drift.",
                     )
+                    fig = fairness_over_time_figure(selected_result)
+                    if fig.data:
+                        apply_research_layout(
+                            fig, height=470, legend="bottom",
+                            title=f"{selected_fw} · fairness gaps across stream windows",
+                            bottom_margin=104,
+                        )
+                        plot(fig, "rai_v64_fairness_over_time")
+                    else:
+                        st.info(framework_label("This run has final group evidence but no window-level fairness trajectory for the selected framework."))
+
+                    section(
+                        "Fairness–performance frontier",
+                        "Compare prequential accuracy against demographic-parity disparity across frameworks without reducing both objectives to one score.",
+                    )
+                    fig = fairness_performance_frontier(results, "dp_diff")
+                    if fig.data:
+                        apply_research_layout(
+                            fig, height=460, legend="none",
+                            title="Accuracy–fairness frontier · demographic parity gap",
+                            bottom_margin=62,
+                        )
+                        plot(fig, "rai_v64_fairness_performance_frontier")
+                        st.caption(
+                            "Outlined diamonds are nondominated for higher Accuracy and lower demographic-parity gap. This is an exploratory two-objective frontier, not a claim that demographic parity is the only fairness definition."
+                        )
+
+                    with st.expander("Intersectional and threshold-sensitivity readiness", expanded=False):
+                        if len(groups) > 2:
+                            st.success(
+                                "The selected sensitive attribute contains {} supported group labels, so the view already exposes multi-group disparities. If those labels encode intersections, interpret them intersectionally only with matching dataset provenance.".format(len(groups))
+                            )
+                        else:
+                            st.info(
+                                "The active run exposes {} supported group label(s) for one sensitive attribute. A genuine intersectional audit requires explicitly encoded intersectional groups or multiple protected attributes; AwareML does not invent them.".format(len(groups))
+                            )
+                        st.info(
+                            "Fairness-threshold sensitivity requires stored group-level probability/label samples across thresholds. The current benchmark keeps aggregate calibration evidence, so no synthetic threshold curve is drawn."
+                        )
 
     with overview_tab:
         if results and not frame.empty:

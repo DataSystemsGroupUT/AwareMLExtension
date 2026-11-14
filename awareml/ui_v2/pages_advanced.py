@@ -8,13 +8,11 @@ from .components import hero
 from .page_utils import phase_pills
 from .pages_specialist import (
     decision_lab_v2_page,
-    fairness_v2_page,
     sustainability_v2_page,
     trust_calibration_v2_page,
     information_seeking_v2_page,
 )
 from .pages_hyperparameter_lab import hyperparameter_lab_page
-from .pages_observatory import streaming_observatory_page
 
 
 def advanced_labs_page():
@@ -29,8 +27,6 @@ def advanced_labs_page():
 
     labs = {
         "Decision Lab · observed post-run ranking": decision_lab_v2_page,
-        "Drift & Temporal Lab": streaming_observatory_page,
-        "Fairness Lab": fairness_v2_page,
         "Sustainability Lab": sustainability_v2_page,
         "Hyperparameter Impact & Modification": hyperparameter_lab_page,
         "Trust Calibration": trust_calibration_v2_page,
