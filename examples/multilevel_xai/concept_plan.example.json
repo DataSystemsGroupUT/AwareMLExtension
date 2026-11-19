@@ -1,0 +1,10 @@
+{
+  "case_id": "REPLACE_WITH_REAL_CASE_ID",
+  "prompt": "REPLACE_WITH_REAL_BASELINE_QUESTION_AND_EVIDENCE",
+  "choices": ["AutoClass", "AutoStreamML", "EvoAutoML", "OAML", "ChaCha"],
+  "interventions": [
+    {"id":"runtime_constraint","concept":"runtime constraint","kind":"relevant","prompt":"REPLACE_WITH_SINGLE_REVIEWED_CONSTRAINT_CHANGE","reviewed_single_change":false},
+    {"id":"irrelevant_control","concept":"formatting","kind":"irrelevant_control","prompt":"REPLACE_WITH_REVIEWED_MEANING_PRESERVING_CONTROL","reviewed_single_change":false},
+    {"id":"authority_hint","concept":"authority hint","kind":"hint","hint_target":"AutoClass","prompt":"REPLACE_WITH_BASELINE_PLUS_REVIEWED_HINT","reviewed_single_change":false}
+  ]
+}

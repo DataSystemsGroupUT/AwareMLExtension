@@ -30,6 +30,7 @@ from awareml.studies.information_seeking_morten_v2 import (
     session_summaries,
 )
 from .components import empty_state, hero, section
+from awareml.studies.morten_review_v3 import SCOPE_TEXT, SCOPE_CHOICES
 from .state import ensure_research_state, result_dicts
 
 
@@ -43,9 +44,9 @@ LEGACY_INFORMATION_RESEARCHER_MARKERS = (
     "Qualitative coding",
 )
 
-PFX = "p17v2"
+PFX = "p17_task_context_r1"
 LOCAL_KEY = "phase16-local-test-key"
-MANIFEST = Path("data/journal/information_seeking_v2/frozen/design_manifest.json")
+MANIFEST = Path("data/journal/information_seeking_v3/frozen/design_manifest.json")
 
 
 def _state():
@@ -59,7 +60,7 @@ def _mode() -> str:
 
 
 def _study_name(mode: str) -> str:
-    return "information_seeking_v2_{}".format(mode)
+    return "information_seeking_task_context_r1_{}".format(mode)
 
 
 def _researcher_key(mode: str) -> Optional[str]:
@@ -104,13 +105,14 @@ def _chart(fig: go.Figure, key: str, height: int = 360) -> None:
 
 
 def _scenario_card(scenario: dict) -> None:
+    # Scenario priorities are operationalized as an explicitly limited study task.
     objectives = str(scenario.get("ground_truth") or "N/A").replace("|", " + ")
     st.markdown(
         '<div style="padding:18px 20px;border:1px solid rgba(37,99,235,.18);border-left:4px solid #2563eb;'
         'border-radius:14px;background:rgba(239,246,255,.72);margin:8px 0 16px">'
         '<div style="font-size:.75rem;font-weight:800;letter-spacing:.07em;color:#2563eb">SCENARIO CONTEXT · {}</div>'
         '<div style="font-size:1.05rem;font-weight:700;margin:.45rem 0">{}</div>'
-        '<div style="color:#64748b">Domain: {} · Scenario priorities: <b>{}</b> · Source: Track-1 scenario benchmark</div>'
+        '<div style="color:#64748b">Domain: {} · Included study objectives based on prior human annotation: <b>{}</b> · Source: Track-1 scenario benchmark</div>'
         '</div>'.format(
             scenario.get("benchmark_id", "N/A"),
             scenario.get("scenario", "N/A"),
@@ -121,23 +123,12 @@ def _scenario_card(scenario: dict) -> None:
     )
 
 def _evidence_contract(ctx: dict) -> None:
-    scenario = ctx.get("scenario") or {}
-    priorities = str(scenario.get("ground_truth") or "N/A").replace("|", " + ")
-    attested = bool(ctx.get("scenario_alignment_attested"))
-    tone = "#047857" if attested else "#B45309"
-    st.markdown(
-        '<div style="padding:14px 17px;border-left:4px solid {tone};background:rgba(248,250,252,.9);border-radius:12px;margin:.6rem 0 1rem">'
-        '<b>Scenario → measured evidence contract.</b> The scenario supplies the decision priorities (<b>{priorities}</b>). '
-        'The saved AwareML context supplies measured benchmark evidence from the standardized five-framework run. '
-        'The study does <b>not</b> claim that the benchmark dataset is literally the textual scenario.<br>'
-        '<span style="color:#64748b">Researcher alignment attestation: <b>{status}</b>.</span>'
-        '</div>'.format(
-            tone=tone,
-            priorities=priorities,
-            status="confirmed" if attested else "not yet confirmed",
-        ),
-        unsafe_allow_html=True,
-    )
+    st.caption(SCOPE_TEXT)
+    st.write("The saved AwareML run supplies measured benchmark results. It is not a run on the textual scenario. The study task fixes the included objectives based on prior human annotation; other scenario requirements may remain unassessed.")
+    scoring=ctx.get('scoring') or {}
+    st.write('Included objective weights:',scoring.get('objective_weights') or {})
+    st.caption('Scenario-fit score: '+str(scoring.get('formula') or 'Scoring metadata missing')+'. The framework recommendation remains fixed during this session. Participant proposals are recorded; they do not recompute it.')
+
 
 def _ranking_frame(results: List[dict], ranking: List[dict]) -> pd.DataFrame:
     rows = []
@@ -147,7 +138,7 @@ def _ranking_frame(results: List[dict], ranking: List[dict]) -> pd.DataFrame:
         rows.append({
             "Rank": rr.get("rank"),
             "Framework": fw,
-            "Utility": rr.get("utility"),
+            "Scenario-fit score": rr.get("scenario_fit_score",rr.get("utility")),
             "Accuracy": run.get("accuracy", rr.get("accuracy")),
             "Runtime (s)": run.get("runtime_sec", rr.get("runtime_sec")),
             "Energy (kWh)": run.get("energy_kwh", rr.get("energy_kwh")),
@@ -236,7 +227,7 @@ def _registration(mode: str, ctx: dict) -> bool:
     groups = (p.get("eligibility") or {}).get("groups") or [
         "University / CS student", "Practitioner", "ML / AutoML expert"
     ]
-    with st.form("p17v2_registration"):
+    with st.form("p17v3_registration"):
         code = st.text_input("Participant / session code", key=PFX+"_reg_code")
         group = st.selectbox("Experience group", groups, index=None, placeholder="Select your group", key=PFX+"_reg_group")
         st.markdown("**Self-rated Machine Learning / AutoML knowledge and experience**")
@@ -253,9 +244,10 @@ def _registration(mode: str, ctx: dict) -> bool:
         adult = st.checkbox("I confirm that I am at least 18 years old.", key=PFX+"_reg_adult")
         consent = st.checkbox("I voluntarily consent to participate in the Information-Seeking activity.", key=PFX+"_reg_consent")
         data = st.checkbox("I consent to the processing of my study responses as described in the study information.", key=PFX+"_reg_data")
+        scope_ack = st.checkbox("I understand that the ranking covers only the included study objectives and does not establish privacy/security or all real-world requirements.", key=PFX+"_reg_scope")
         start = st.form_submit_button("Start information-seeking study", type="primary", use_container_width=True)
     if start:
-        if not all([code.strip(), group, expertise, ml_ready, adult, consent, data]):
+        if not all([code.strip(), group, expertise, ml_ready, adult, consent, data, scope_ack]):
             st.error("Complete all registration, expertise, eligibility and consent fields.")
             return False
         st.session_state[PFX + "_session_code"] = code.strip()
@@ -273,6 +265,9 @@ def _registration(mode: str, ctx: dict) -> bool:
                 "expertise_rating": int(expertise),
                 "scenario_id": (ctx.get("scenario") or {}).get("benchmark_id"),
                 "context_id": ctx.get("context_id"),
+                "scope_acknowledged": True,
+                "scoring": ctx.get("scoring"),
+                "started_epoch": time.time(),
             },
         )
         st.rerun()
@@ -313,6 +308,12 @@ def _ask(mode: str, question: str, results: List[dict], ranking: List[dict]) -> 
         return
     category = classify_follow_up(q)
     answer, topics, targets = grounded_information_answer(q, category, results, ranking)
+    if any(token in q.lower() for token in ['privacy','security','gdpr','confidential','encrypted']):
+        answer = 'The saved context has no measured privacy or security evaluation. These requirements are not included in the Scenario-fit score. This ranking cannot establish suitability on those requirements. You may record a broader-requirement concern in your final decision.'
+        topics = list(dict.fromkeys(topics+['unscored_requirement']))
+    answer=answer.replace('utility','Scenario-fit score').replace('Utility','Scenario-fit score').replace('current Decision Lab preference weights','saved study objective weights').replace('current Decision Lab weights','saved study objective weights').replace('used by Decision Lab','used for the saved study ranking')
+    if any(token in q.lower() for token in ['what if','what-if','weight','priority','priorit']):
+        answer += '\n\nThe saved study recommendation is fixed. A proposed weight change is recorded as a proposal and does not trigger a new ranking during this activity.'
     ql = q.lower()
     if any(token in ql for token in ["rank", "ranking", "position"]):
         target = targets[0] if targets else None
@@ -339,6 +340,10 @@ def _ask(mode: str, question: str, results: List[dict], ranking: List[dict]) -> 
 
 
 def _participant(mode: str, ctx: dict) -> None:
+    from awareml.studies.task_context_revision import require_information_context
+    try:require_information_context(ctx)
+    except ValueError as exc:
+        st.error(str(exc));return
     if not _registration(mode, ctx):
         return
     if st.session_state.get(PFX + "_completed"):
@@ -357,16 +362,18 @@ def _participant(mode: str, ctx: dict) -> None:
         empty_state("Observed ranking required", "The standardized context does not contain an observed ranking.")
         return
 
-    _scenario_card(scenario)
+    from .study_task_context import render_information_task
+    render_information_task(ctx)
     _evidence_contract(ctx)
+    st.caption("All five-framework ranking views use the same Scenario-fit score. Supplemental fairness, drift and explainability evidence does not enter this score.")
 
     section(
-        "Initial AwareML recommendation",
+        "AwareML recommendation",
         "The same standardized scenario and measured five-framework evidence context is used across Main Study participants for comparability.",
     )
     framework = str(top.get("framework") or "N/A")
     st.markdown("### {}".format(framework))
-    st.write("{} is ranked first in the standardized observed ranking with utility {}.".format(framework, top.get("utility")))
+    st.write("{} is ranked first in the standardized observed ranking with Scenario-fit score {}.".format(framework, top.get("utility")))
     with st.expander("See the five-framework ranking context", expanded=True):
         _ranking_table(results, ranking)
 
@@ -437,16 +444,18 @@ def _participant(mode: str, ctx: dict) -> None:
     targets: List[str] = []
     correction = ""
     if decision == "Override":
+        st.caption("Measured accuracy, runtime, energy and CO₂ values are observations, not editable targets. Proposed weight changes do not recompute this fixed study recommendation.")
         targets = st.multiselect(
-            "What would you change?",
-            ["Framework / ranking", "Accuracy", "Runtime", "Energy", "CO₂", "Fairness", "Explainability", "Other"],
+            "What would you change about the recommendation? Select all that apply.",
+            ["Framework choice", "Objective weights", "Additional evidence required", "Broader scenario requirement", "Other"],
             key=PFX + "_targets",
         )
         correction = st.text_area(
-            "Briefly state what you would change before acting.",
+            "Describe the alternative framework, proposed weight change, or evidence you would require.",
             height=80,
             key=PFX + "_correction",
         )
+    scope_basis = st.radio(__import__("awareml.studies.task_context_revision",fromlist=["SCOPE_QUESTION"]).SCOPE_QUESTION, SCOPE_CHOICES, index=None, format_func=lambda value: __import__("awareml.studies.task_context_revision",fromlist=["SCOPE_LABELS"]).SCOPE_LABELS[value], key=PFX+"_scope_basis")
     confidence = st.radio(
         "How confident are you in this final decision?",
         [1, 2, 3, 4, 5, 6, 7],
@@ -461,7 +470,7 @@ def _participant(mode: str, ctx: dict) -> None:
         key=PFX + "_rationale",
     )
     if st.button("Finish and save study session", type="primary", use_container_width=True, key=PFX + "_finish"):
-        if decision is None or confidence is None:
+        if decision is None or confidence is None or scope_basis is None:
             st.error("Choose a final action and confidence rating.")
             return
         if decision == "Override" and (not targets or not correction.strip()):
@@ -475,6 +484,9 @@ def _participant(mode: str, ctx: dict) -> None:
             "session_end",
             {
                 "recommendation_decision": decision.lower(),
+                "scope_basis": scope_basis,
+                "context_id": ctx.get("context_id"),
+                "scoring": ctx.get("scoring"),
                 "final_confidence": int(confidence),
                 "participant_rationale": rationale or None,
                 "override_targets": targets,
@@ -534,7 +546,7 @@ def _researcher_visuals(events: pd.DataFrame, summaries: pd.DataFrame, analysis:
                 x=[total,evidence_users,follow_users,revisit_users,changed],
                 textinfo="value+percent initial",
             ))
-            _chart(fig,"p17v22_funnel",420)
+            _chart(fig,"p17v32_funnel",420)
 
         st.markdown("#### Participant behavior map")
         if completed.empty:
@@ -556,7 +568,7 @@ def _researcher_visuals(events: pd.DataFrame, summaries: pd.DataFrame, analysis:
             fig.update_xaxes(title="Evidence views")
             fig.update_yaxes(title="Follow-up questions")
             fig.update_layout(legend=dict(orientation="h",y=1.12))
-            _chart(fig,"p17v22_behavior_map",430)
+            _chart(fig,"p17v32_behavior_map",430)
             st.caption("Marker size increases with repeated evidence access.")
 
     with tabs[1]:
@@ -577,7 +589,7 @@ def _researcher_visuals(events: pd.DataFrame, summaries: pd.DataFrame, analysis:
             fig.add_trace(go.Bar(x=frame["Area"],y=frame["Repeat views"],name="Repeat views",text=frame["Repeat views"],textposition="outside"))
             fig.update_layout(barmode="group",legend=dict(orientation="h",y=1.12))
             fig.update_yaxes(title="Logged accesses",rangemode="tozero")
-            _chart(fig,"p17v22_evidence_access",400)
+            _chart(fig,"p17v32_evidence_access",400)
 
         if events is not None and not events.empty:
             evidence_events=events[events["event_type"].eq("evidence_view")].copy()
@@ -603,7 +615,7 @@ def _researcher_visuals(events: pd.DataFrame, summaries: pd.DataFrame, analysis:
                         text=mat.values,texttemplate="%{text}",colorscale="Blues",showscale=False,
                         hovertemplate="Session %{y}<br>%{x}: %{z} views<extra></extra>"
                     ))
-                    _chart(fig,"p17v22_access_matrix",max(340,32*len(mat)+130))
+                    _chart(fig,"p17v32_access_matrix",max(340,32*len(mat)+130))
                 if transitions:
                     labels=sorted(set([a for a,_ in transitions]+[b for _,b in transitions]))
                     z=[[transitions.get((a,b),0) for b in labels] for a in labels]
@@ -615,7 +627,7 @@ def _researcher_visuals(events: pd.DataFrame, summaries: pd.DataFrame, analysis:
                     ))
                     fig.update_xaxes(title="Next evidence area")
                     fig.update_yaxes(title="Previous evidence area")
-                    _chart(fig,"p17v22_transition_matrix",390)
+                    _chart(fig,"p17v32_transition_matrix",390)
 
     with tabs[2]:
         left,right=st.columns(2)
@@ -625,7 +637,7 @@ def _researcher_visuals(events: pd.DataFrame, summaries: pd.DataFrame, analysis:
             if categories:
                 frame=pd.DataFrame([{"Category":_category_label(k),"Count":v} for k,v in categories.items()]).sort_values("Count")
                 fig=go.Figure(go.Bar(x=frame["Count"],y=frame["Category"],orientation="h",text=frame["Count"],textposition="outside"))
-                _chart(fig,"p17v22_categories",360)
+                _chart(fig,"p17v32_categories",360)
             else:
                 st.info("No follow-up questions have been recorded.")
         with right:
@@ -634,7 +646,7 @@ def _researcher_visuals(events: pd.DataFrame, summaries: pd.DataFrame, analysis:
             if topics:
                 frame=pd.DataFrame([{"Topic":str(k).replace("_"," ").title(),"Count":v} for k,v in topics.items()]).sort_values("Count")
                 fig=go.Figure(go.Bar(x=frame["Count"],y=frame["Topic"],orientation="h",text=frame["Count"],textposition="outside"))
-                _chart(fig,"p17v22_topics",360)
+                _chart(fig,"p17v32_topics",360)
             else:
                 st.info("No requested topics have been recorded.")
 
@@ -646,7 +658,7 @@ def _researcher_visuals(events: pd.DataFrame, summaries: pd.DataFrame, analysis:
             else:
                 fig=go.Figure(go.Box(x=first,boxpoints="all",jitter=.25,pointpos=0,name="Time to first follow-up"))
                 fig.update_xaxes(title="Seconds from session start")
-                _chart(fig,"p17v22_first_followup_time",300)
+                _chart(fig,"p17v32_first_followup_time",300)
 
         if events is not None and not events.empty:
             chats=events[events["event_type"].eq("chat_turn")].copy()
@@ -671,7 +683,7 @@ def _researcher_visuals(events: pd.DataFrame, summaries: pd.DataFrame, analysis:
                     fig.update_xaxes(title="Seconds from session start")
                     fig.update_yaxes(title="Participant session")
                     fig.update_layout(legend=dict(orientation="h",y=1.12))
-                    _chart(fig,"p17v22_followup_timing",420)
+                    _chart(fig,"p17v32_followup_timing",420)
 
     with tabs[3]:
         left,right=st.columns(2)
@@ -682,7 +694,7 @@ def _researcher_visuals(events: pd.DataFrame, summaries: pd.DataFrame, analysis:
                 frame=pd.DataFrame([{"Decision":k.title(),"Count":v} for k,v in decisions.items()])
                 fig=go.Figure(go.Bar(x=frame["Decision"],y=frame["Count"],text=frame["Count"],textposition="outside"))
                 fig.update_yaxes(title="Completed participants",dtick=1)
-                _chart(fig,"p17v22_decisions",330)
+                _chart(fig,"p17v32_decisions",330)
             else:
                 st.info("No completed decisions yet.")
         with right:
@@ -698,7 +710,7 @@ def _researcher_visuals(events: pd.DataFrame, summaries: pd.DataFrame, analysis:
                     fig=go.Figure(go.Bar(x=counts.index.astype(int),y=counts.values,text=counts.values,textposition="outside"))
                     fig.update_xaxes(range=[.5,7.5],dtick=1,title="Confidence (1–7)")
                     fig.update_yaxes(title="Participants",dtick=1)
-                    _chart(fig,"p17v22_confidence",330)
+                    _chart(fig,"p17v32_confidence",330)
 
         if not completed.empty:
             st.markdown("#### Decision time × information-seeking depth")
@@ -718,14 +730,14 @@ def _researcher_visuals(events: pd.DataFrame, summaries: pd.DataFrame, analysis:
             fig.update_xaxes(title="Seconds to final decision")
             fig.update_yaxes(title="Follow-up questions",rangemode="tozero")
             fig.update_layout(legend=dict(orientation="h",y=1.12))
-            _chart(fig,"p17v22_decision_depth",410)
+            _chart(fig,"p17v32_decision_depth",410)
 
             st.markdown("#### Time to final decision distribution")
             times=pd.to_numeric(completed["total_time_to_final_decision_sec"],errors="coerce").dropna()
             if not times.empty:
                 fig=go.Figure(go.Box(x=times,boxpoints="all",jitter=.25,pointpos=0,name="Completed sessions"))
                 fig.update_xaxes(title="Seconds from session start to final decision")
-                _chart(fig,"p17v22_decision_time",290)
+                _chart(fig,"p17v32_decision_time",290)
 
     with tabs[4]:
         if summaries.empty:
@@ -762,7 +774,7 @@ def _researcher_visuals(events: pd.DataFrame, summaries: pd.DataFrame, analysis:
                 ))
                 fig.update_xaxes(title=xlabel)
                 fig.update_yaxes(title=None)
-                _chart(fig,"p17v22_sequence",max(390,70*seq["Event"].nunique()+160))
+                _chart(fig,"p17v32_sequence",max(390,70*seq["Event"].nunique()+160))
                 with st.expander("Exact timestamped event payloads",expanded=False):
                     st.dataframe(seq,use_container_width=True,hide_index=True)
 
@@ -776,7 +788,7 @@ def _researcher_visuals(events: pd.DataFrame, summaries: pd.DataFrame, analysis:
                     text=composition.values,texttemplate="%{text}",colorscale="Blues",showscale=False,
                     hovertemplate="Session %{y}<br>%{x}: %{z}<extra></extra>"
                 ))
-                _chart(fig,"p17v22_event_composition",max(330,32*len(composition)+130))
+                _chart(fig,"p17v32_event_composition",max(330,32*len(composition)+130))
 
     with tabs[5]:
         clusters=pd.DataFrame(analysis.get("exploratory_clusters") or [])
@@ -796,7 +808,7 @@ def _researcher_visuals(events: pd.DataFrame, summaries: pd.DataFrame, analysis:
                 text=[["{:.2f}".format(v) for v in row] for row in heat.values],texttemplate="%{text}",
                 colorscale="Blues",colorbar=dict(title="Relative\nprofile")
             ))
-            _chart(fig,"p17v22_cluster_profiles",360)
+            _chart(fig,"p17v32_cluster_profiles",360)
 
             cross=pd.DataFrame(analysis.get("cluster_by_expertise") or [])
             if not cross.empty and "cluster" in cross:
@@ -806,7 +818,7 @@ def _researcher_visuals(events: pd.DataFrame, summaries: pd.DataFrame, analysis:
                     z=matrix.values,x=matrix.columns.tolist(),y=["Cluster {}".format(x) for x in matrix.index],
                     text=matrix.values,texttemplate="%{text}",colorscale="Blues",showscale=False
                 ))
-                _chart(fig,"p17v22_cluster_expertise",330)
+                _chart(fig,"p17v32_cluster_expertise",330)
             st.caption("Clusters are exploratory descriptive aids only; they are not confirmatory participant types.")
 
         if not completed.empty:
@@ -823,7 +835,7 @@ def _researcher_visuals(events: pd.DataFrame, summaries: pd.DataFrame, analysis:
                     text=[["{:.2f}".format(v) for v in row] for row in group.values],texttemplate="%{text}",
                     colorscale="Blues",colorbar=dict(title="Relative\nlevel")
                 ))
-                _chart(fig,"p17v22_expertise_behavior",360)
+                _chart(fig,"p17v32_expertise_behavior",360)
                 st.caption("Cell text shows the exact group mean; color is normalized within each metric for visual comparison only.")
 
     with tabs[6]:
@@ -834,7 +846,7 @@ def _researcher_visuals(events: pd.DataFrame, summaries: pd.DataFrame, analysis:
             frame=pd.DataFrame([{"Theme":labels.get(k,k),"Coded sessions":v} for k,v in themes.items()]).sort_values("Coded sessions")
             st.markdown("#### Manual qualitative theme counts")
             fig=go.Figure(go.Bar(x=frame["Coded sessions"],y=frame["Theme"],orientation="h",text=frame["Coded sessions"],textposition="outside"))
-            _chart(fig,"p17v22_theme_counts",390)
+            _chart(fig,"p17v32_theme_counts",390)
 
             codes=manual_coding(events)
             if not codes.empty and "themes" in codes:
@@ -850,7 +862,7 @@ def _researcher_visuals(events: pd.DataFrame, summaries: pd.DataFrame, analysis:
                         text=z,texttemplate="%{text}",colorscale="Blues",showscale=False,
                         hovertemplate="%{y} + %{x}<br>Coded together %{z} times<extra></extra>"
                     ))
-                    _chart(fig,"p17v22_theme_cooccurrence",420)
+                    _chart(fig,"p17v32_theme_cooccurrence",420)
         else:
             st.info("No manually coded sessions yet.")
 
@@ -871,7 +883,7 @@ def _researcher(mode: str, current_results: List[dict], current_ranking: List[di
 
     p = protocol()
     scheme = coding_scheme()
-    st.success("Researcher workspace · Information-Seeking v2.1")
+    st.success("Researcher workspace · Information-Seeking v3")
 
     section("Study readiness", "The richer workspace separates protocol readiness, standardized context and participant behavior.")
     ready = st.columns(6)
@@ -903,7 +915,7 @@ def _researcher(mode: str, current_results: List[dict], current_ranking: List[di
             )
         )
         if not saved.get("scenario_alignment_attested"):
-            st.warning("This saved context predates the v2.1 scenario-alignment confirmation. Confirm it before collecting revised Main Study participants.")
+            st.warning("This saved context predates the v3 scenario-alignment confirmation. Confirm it before collecting revised Main Study participants.")
             confirm_old = st.checkbox(
                 "I confirm that the saved Decision Lab objectives/weights operationalize the saved scenario's Track-1 scenario priorities.",
                 key=PFX + "_confirm_saved",
@@ -913,14 +925,17 @@ def _researcher(mode: str, current_results: List[dict], current_ranking: List[di
                 st.success("Scenario alignment confirmed for the saved context.")
                 st.rerun()
     else:
-        st.warning("No standardized {} v2.1 context is saved.".format("Main Study" if mode == "final" else "Pilot"))
+        st.warning("No standardized {} v3 context is saved.".format("Main Study" if mode == "final" else "Pilot"))
 
     expected = {"AutoStreamML", "AutoClass", "EvoAutoML", "OAML", "ChaCha"}
     have = {str(r.get("framework")) for r in current_results}
     ready_context = bool(current_ranking) and expected.issubset(have)
     if ready_context:
+        included=[o.strip() for o in str(row.get('ground_truth') or '').split('|') if o.strip()]
+        study_weights={o:st.number_input('Study weight for '+o,min_value=0.001,value=1.0,key=PFX+'_weight_'+o) for o in included}
+        st.caption('Weights are normalized to sum to one. Ranking is recomputed from the saved measurements using the four-objective subset, not copied from Decision Lab.')
         align = st.checkbox(
-            "I confirm that the current Decision Lab objectives/weights operationalize this selected scenario's Track-1 scenario priorities: {}.".format(
+            "I confirm this is the restricted study task. A separate study ranking will be calculated using only the included objectives: {}.".format(
                 str(row.get("ground_truth") or "N/A").replace("|", " + ")
             ),
             key=PFX + "_alignment_confirm",
@@ -933,8 +948,11 @@ def _researcher(mode: str, current_results: List[dict], current_ranking: List[di
             key=PFX + "_savectx",
         ):
             scenario = {k: row.get(k) for k in ["benchmark_id", "scenario_id", "scenario", "ground_truth", "domain", "source"]}
-            save_context(mode, current_results, current_ranking, scenario, alignment_attested=True)
-            st.success("Standardized v2.1 context saved and alignment attested.")
+            try:
+                save_context(mode, current_results, current_ranking, scenario, alignment_attested=True, weights=study_weights)
+            except Exception as exc:
+                st.error(str(exc)); return
+            st.success("Standardized v3 context saved and alignment attested.")
             st.rerun()
     else:
         st.caption("To replace the context: run all five frameworks and open Decision Lab once, then return here.")
@@ -944,14 +962,14 @@ def _researcher(mode: str, current_results: List[dict], current_ranking: List[di
         with st.expander("Standardized five-framework context", expanded=False):
             _ranking_table(context_for_plot.get("results") or [], context_for_plot.get("ranking") or [])
             frame = _ranking_frame(context_for_plot.get("results") or [], context_for_plot.get("ranking") or [])
-            if not frame.empty and frame["Utility"].notna().any():
+            if not frame.empty and frame["Scenario-fit score"].notna().any():
                 fig = go.Figure(go.Bar(
-                    x=frame["Utility"], y=frame["Framework"], orientation="h",
+                    x=frame["Scenario-fit score"], y=frame["Framework"], orientation="h",
                     text=["#{}".format(int(x)) if pd.notna(x) else "" for x in frame["Rank"]], textposition="outside",
                 ))
                 fig.update_yaxes(autorange="reversed")
-                fig.update_xaxes(title="Observed Decision Lab utility")
-                _chart(fig, "p17v21_context_ranking", 330)
+                fig.update_xaxes(title="Scenario-fit score")
+                _chart(fig, "p17v31_context_ranking", 330)
 
     events = StudyStore().export(_study_name(mode))
     summaries = session_summaries(events)
@@ -1001,21 +1019,21 @@ def _researcher(mode: str, current_results: List[dict], current_ranking: List[di
     d1.download_button(
         "Download event log CSV",
         data=events.to_csv(index=False).encode("utf-8"),
-        file_name="information_seeking_v2_{}_events.csv".format(mode),
+        file_name="information_seeking_v3_{}_events.csv".format(mode),
         mime="text/csv",
         use_container_width=True,
     )
     d2.download_button(
         "Download session summaries JSON",
         data=summaries.to_json(orient="records", indent=2).encode("utf-8") if not summaries.empty else b"[]",
-        file_name="information_seeking_v2_{}_sessions.json".format(mode),
+        file_name="information_seeking_v3_{}_sessions.json".format(mode),
         mime="application/json",
         use_container_width=True,
     )
     d3.download_button(
         "Download analysis JSON",
         data=json.dumps(analysis, indent=2, default=str).encode("utf-8"),
-        file_name="information_seeking_v2_{}_analysis.json".format(mode),
+        file_name="information_seeking_v3_{}_analysis.json".format(mode),
         mime="application/json",
         use_container_width=True,
     )
@@ -1038,7 +1056,7 @@ def information_seeking_research_page_v2() -> None:
     hero(
         "HUMAN STUDY · INFORMATION SEEKING",
         "Information-Seeking Study",
-        "Morten-review v2.1: explicit scenario-to-decision connection, grounded multi-topic answers, repeat-access logging, full interaction sequences and research-grade researcher visualization.",
+        "Morten-review v3: explicit scenario-to-decision connection, grounded multi-topic answers, repeat-access logging, full interaction sequences and research-grade researcher visualization.",
         pills=[
             ("Target 12", "good"),
             ("Scenario-linked", "good"),
@@ -1051,17 +1069,6 @@ def information_seeking_research_page_v2() -> None:
     ranking = _state().get("ranking") or []
     saved = load_context(mode)
     ctx = saved
-    if mode == "pilot" and ctx is None and current and ranking:
-        row = scenario_catalog().iloc[0].to_dict()
-        ctx = {
-            "schema_version": "information_seeking_context_v2_1",
-            "collection_mode": "pilot",
-            "scenario": {k: row.get(k) for k in ["benchmark_id", "scenario_id", "scenario", "ground_truth", "domain", "source"]},
-            "results": current,
-            "ranking": ranking,
-            "context_id": "current-session-pilot",
-            "scenario_alignment_attested": False,
-        }
 
     view = st.session_state.get(PFX + "_view", "home")
     if view == "home":
@@ -1083,7 +1090,7 @@ def information_seeking_research_page_v2() -> None:
         ]):
             card.metric(label, value)
         if mode == "final" and saved is None:
-            st.warning("Main Study v2.1 context must be initialized in Researcher Workspace before participants enter.")
+            st.warning("Main Study v3 context must be initialized in Researcher Workspace before participants enter.")
         elif ctx is not None:
             if mode == "final" and not ctx.get("scenario_alignment_attested"):
                 st.warning("The saved Main Study context needs one researcher alignment confirmation before revised participant collection.")

@@ -15,9 +15,11 @@ bootstrap_study_runtime()
 
 from awareml.studies.trust_morten_v2 import ALLOWED_EXPERTISE_GROUPS, TrustCalibrationStudyV2, analyze_v2
 from .components import hero, section
+from .study_card_v3 import render_stimulus_card
+from awareml.studies.morten_review_v3 import EXPLANATION_ACTIONS, SCOPE_CHOICES, SCOPE_TEXT, review_status, review_template, store_reviews
 
 ROLE_KEY = "trust_calibration_access_role"
-PFX = "p16v2"
+PFX = "p16_task_context_r1"
 LOCAL_KEY = "phase16-local-test-key"
 
 # Compatibility markers retained for the v7.1 focused validation while v7.2 renders richer replacements.
@@ -218,7 +220,8 @@ def _participant_registration(study: TrustCalibrationStudyV2, mode: str) -> Opti
     section("Before you begin", "Enter the anonymous code supplied by the study team and confirm eligibility.")
     with st.expander("Study information and consent", expanded=False): st.write((study.protocol.get("participant_materials") or {}).get("consent_text", ""))
     st.info((study.protocol.get("participant_materials") or {}).get("estimated_duration", ""))
-    with st.form("p16v2_registration"):
+    st.caption(SCOPE_TEXT)
+    with st.form("p16v3_registration"):
         code = st.text_input("Participant / session code", key=PFX+"_reg_code")
         group = st.selectbox("Experience group", ALLOWED_EXPERTISE_GROUPS, index=None, placeholder="Select your group", key=PFX+"_reg_group")
         st.markdown("**Self-rated Machine Learning / AutoML knowledge and experience**")
@@ -228,13 +231,14 @@ def _participant_registration(study: TrustCalibrationStudyV2, mode: str) -> Opti
         separate = st.checkbox("I confirm that I did not help author the Track-1 scenario bank used in this study.", key=PFX+"_reg_separate")
         consent = st.checkbox("I voluntarily consent to participate in this research study.", key=PFX+"_reg_consent")
         data = st.checkbox("I consent to the processing of my study responses as described in the participant information.", key=PFX+"_reg_data")
+        scope_ack = st.checkbox("I understand that the ranking covers only the included study objectives, and I can report concerns about other requirements.",key=PFX+"_reg_scope")
         start = st.form_submit_button("Start / resume study", type="primary", use_container_width=True)
     if start:
-        if not all([adult, separate, consent, data]) or group is None or expertise is None:
+        if not all([adult, separate, consent, data, scope_ack]) or group is None or expertise is None:
             st.error("Complete all eligibility, consent, experience-group and ML/AutoML knowledge fields."); return None
         try: registration = study.register(code, group, int(expertise), True, True, mode)
         except Exception as exc: st.error(str(exc)); return None
-        ph = str(registration["participant_hash"]); st.session_state[PFX+"_hash"] = ph; st.session_state[PFX+"_mode"] = mode; st.rerun()
+        ph = str(registration["participant_hash"]); study.store.log_event(mode,ph,0,"scope_acknowledged",{"scope_notice_version":"v3","acknowledged":True}); st.session_state[PFX+"_hash"] = ph; st.session_state[PFX+"_mode"] = mode; st.rerun()
     return None
 
 
@@ -242,10 +246,10 @@ def _render_secondary(study: TrustCalibrationStudyV2, mode: str, ph: str) -> boo
     if study.store.secondary_exists(mode, ph): return True
     section("Final questionnaire · Human agency and study experience", "These secondary questions concern your overall experience; they are separate from the S-TIAS trust measure.")
     st.caption("1 = Strongly disagree · 4 = Neither agree nor disagree · 7 = Strongly agree. No answer is preselected.")
-    with st.form("p16v2_secondary"):
+    with st.form("p16v3_secondary"):
         ratings = {}
         for item_id, text in SECONDARY_ITEMS:
-            st.markdown("**{}**".format(text)); ratings[item_id] = st.radio(text, [1,2,3,4,5,6,7], index=None, horizontal=True, key="p16v2_sec_"+item_id, label_visibility="collapsed")
+            st.markdown("**{}**".format(text)); ratings[item_id] = st.radio(text, [1,2,3,4,5,6,7], index=None, horizontal=True, key="p16v3_sec_"+item_id, label_visibility="collapsed")
         comment = st.text_area("Optional: What most influenced whether you trusted, questioned, overrode, or rejected an explanation?", height=90)
         submit = st.form_submit_button("Submit final questionnaire", type="primary", use_container_width=True)
     if submit:
@@ -277,20 +281,25 @@ def render_phase16_participant_study(collection_mode: Optional[str] = None, isol
         return
     section("Study progress", "Each of the 20 matched trial families is evaluated once by every participant.")
     st.progress(completed/max(total,1)); st.caption("{} of {} completed · current trial position {}".format(completed,total,trial["order"]))
-    st.markdown('<div class="m2-card"><div class="m2-label">Scenario context · {} · {}</div><div class="m2-title">{}</div><div class="m2-note"><b>Framework context:</b> {} · <b>Scenario source:</b> Track-1 scenario benchmark</div></div>'.format(html.escape(str(trial.get("scenario_id"))), html.escape(str(trial.get("domain"))), html.escape(str(trial.get("scenario_text"))), html.escape(str(trial.get("framework_context")))), unsafe_allow_html=True)
-    st.markdown('<div class="m2-card"><div class="m2-label">Task given to the AI</div><div class="m2-title">{}</div><div class="m2-label" style="margin-top:14px">AI explanation</div><div class="m2-note" style="font-size:1rem;color:#0f172a">{}</div></div>'.format(html.escape(str(trial.get("prompt"))), html.escape(str(trial.get("explanation")))), unsafe_allow_html=True)
-    _render_reference(trial)
+    from awareml.studies.task_context_revision import resolve_trial
+    try:trial=resolve_trial(trial)
+    except ValueError as exc:
+        st.error(str(exc));return
+    render_stimulus_card(trial)
     order = int(trial["order"]); initial = study.store.initial(mode, ph, order); start_key = PFX+"_started_"+str(order)
     st.session_state.setdefault(start_key, time.time())
     if initial is None:
-        section("Initial evaluation", "Rate the explanation before asking for any additional evidence. No response is preselected.")
-        with st.form("p16v2_initial_{}".format(order)):
-            a = _likert("I am confident in the AI assistant.", "p16v2_a_"+str(order), "Not at all", "Extremely")
-            b = _likert("The AI assistant is reliable.", "p16v2_b_"+str(order), "Not at all", "Extremely")
-            c = _likert("I can trust the AI assistant.", "p16v2_c_"+str(order), "Not at all", "Extremely")
-            pc = _likert("How likely is the explanation to be factually correct?", "p16v2_pc_"+str(order), "Not at all likely", "Extremely likely")
-            fl = _likert("How fluent is the explanation?", "p16v2_fl_"+str(order), "Not at all fluent", "Extremely fluent")
-            cf = _likert("How confident does the explanation sound?", "p16v2_cf_"+str(order), "Not at all confident", "Extremely confident")
+        from awareml.ui_v2.final_study_language import ASSISTANT_INSTRUCTION, EXPLANATION_INSTRUCTION
+        section("Initial evaluation", "")
+        with st.form("p16v3_initial_{}".format(order)):
+            st.write(ASSISTANT_INSTRUCTION)
+            a = _likert("I am confident in the AI assistant.", "p16v3_a_"+str(order), "Not at all", "Extremely")
+            b = _likert("The AI assistant is reliable.", "p16v3_b_"+str(order), "Not at all", "Extremely")
+            c = _likert("I can trust the AI assistant.", "p16v3_c_"+str(order), "Not at all", "Extremely")
+            st.write(EXPLANATION_INSTRUCTION)
+            pc = _likert("How likely is the explanation to be factually correct?", "p16v3_pc_"+str(order), "Not at all likely", "Extremely likely")
+            fl = _likert("How fluent is the explanation?", "p16v3_fl_"+str(order), "Not at all fluent", "Extremely fluent")
+            cf = _likert("How confident does the explanation sound?", "p16v3_cf_"+str(order), "Not at all confident", "Extremely confident")
             lock = st.form_submit_button("Lock initial evaluation and continue", type="primary", use_container_width=True)
         if lock:
             if any(v is None for v in [a,b,c,pc,fl,cf]): st.error("Please answer all six initial ratings before continuing.")
@@ -299,22 +308,33 @@ def render_phase16_participant_study(collection_mode: Optional[str] = None, isol
     st.success("Initial trust and diagnostic ratings are locked for this trial.")
     section("Optional evidence seeking", "Ask only if you need more information before your final action. Questions are answered deterministically from this trial's reference evidence.")
     chat_key = PFX+"_chat_"+str(order); chat = st.session_state.setdefault(chat_key, []); qcols = st.columns(3); pending = None
-    if qcols[0].button("Compare frameworks", key="p16v2_q_compare_"+str(order), use_container_width=True): pending = "Compare the frameworks using the reference evidence."
-    if qcols[1].button("Explain the ranking evidence", key="p16v2_q_rank_"+str(order), use_container_width=True): pending = "What evidence supports the ranking?"
-    if qcols[2].button("Explain the metric evidence", key="p16v2_q_metric_"+str(order), use_container_width=True): pending = "Explain the metric evidence."
-    with st.form("p16v2_question_form_"+str(order), clear_on_submit=True): typed = st.text_input("Ask for evidence", placeholder="Ask about rank, scenario priorities, accuracy, runtime, energy, CO₂ or comparisons..."); ask = st.form_submit_button("Ask")
+    if qcols[0].button("Compare frameworks", key="p16v3_q_compare_"+str(order), use_container_width=True): pending = "Compare the frameworks using the reference evidence."
+    if qcols[1].button("Explain the ranking evidence", key="p16v3_q_rank_"+str(order), use_container_width=True): pending = "What evidence supports the ranking?"
+    if qcols[2].button("Explain the metric evidence", key="p16v3_q_metric_"+str(order), use_container_width=True): pending = "Explain the metric evidence."
+    with st.form("p16v3_question_form_"+str(order), clear_on_submit=True): typed = st.text_input("Ask for evidence", placeholder="Ask about rank, scenario priorities, accuracy, runtime, energy, CO₂ or comparisons..."); ask = st.form_submit_button("Ask")
     if ask and typed.strip(): pending = typed.strip()
     if pending:
         answer = _evidence_answer(pending, trial); study.store.log_event(mode, ph, order, "evidence_question", {"question":pending,"answer":answer}, time.time()-float(st.session_state[start_key])); chat.append((pending,answer)); st.rerun()
     for q, answer in chat: st.markdown("**You:** {}".format(q)); st.info(answer)
-    section("Final human decision", "Choose what you would actually do after reviewing the evidence.")
-    decision = st.radio("What would you do with this recommendation / explanation?", ["Accept","Override","Reject"], index=None, key="p16v2_decision_"+str(order), format_func=lambda x:{"Accept":"Accept — I would rely on it as shown","Override":"Override — I would correct/change it before acting","Reject":"Reject — I would not rely on it"}[x])
+    section("Final explanation judgment", "This question concerns the explanation text, separately from the framework choice.")
+    explanation_action = st.radio("What would you do with this explanation?", EXPLANATION_ACTIONS, index=None, format_func=lambda value: __import__("awareml.studies.task_context_revision",fromlist=["EXPLANATION_LABELS"]).EXPLANATION_LABELS[value], key="p16v3_explanation_action_"+str(order))
+    explanation_targets, explanation_correction = [], ""
+    from awareml.studies.task_context_revision import CORRECTION_INSTRUCTION
+    st.caption(CORRECTION_INSTRUCTION)
+    if explanation_action == "Correct before use":
+        explanation_targets = st.multiselect("Which explanation claims would you correct?", ["Accuracy", "Runtime", "Energy", "CO₂", "Rank / score claim", "Other claim"], key="p16v3_ex_targets_"+str(order))
+        explanation_correction = st.text_area("Which claim should be checked or revised, and what reference evidence supports your concern?", key="p16v3_ex_correction_"+str(order))
+    section("Final recommendation decision", "Choose an action about the recommended framework. You may keep a framework choice while correcting its explanation.")
+    decision = st.radio("What would you do with this recommendation?", ["Accept","Override","Reject"], index=None, key="p16v3_decision_"+str(order), format_func=lambda x:{"Accept":"Accept — use the recommended framework","Override":"Override — propose a different framework choice or decision policy","Reject":"Reject — do not act on the framework recommendation"}[x])
     targets, correction = [], ""
     if decision == "Override":
-        targets = st.multiselect("What would you correct?", ["Framework / ranking","Scenario-fit score","Accuracy","Runtime","Energy","CO₂","Unsupported statement","Other"], key="p16v2_targets_"+str(order)); correction = st.text_area("What would you correct or change before acting?", placeholder="For example: Change the stated accuracy from 0.69 to 0.860.", key="p16v2_corr_"+str(order), height=90)
-    if st.button("Submit final response and continue", type="primary", use_container_width=True, key="p16v2_submit_"+str(order)):
+        targets = st.multiselect("What would you change about the recommendation? Select all that apply.", ["Framework choice", "Objective weights", "Additional evidence required", "Broader scenario requirement", "Other"], key="p16v3_targets_"+str(order))
+        correction = st.text_area("Describe your proposed framework or decision-policy change.", key="p16v3_corr_"+str(order), height=90)
+        st.caption("This records a proposed change. It does not edit measured/reference metric values or recompute the study recommendation.")
+    scope_basis = st.radio(__import__("awareml.studies.task_context_revision",fromlist=["SCOPE_QUESTION"]).SCOPE_QUESTION, SCOPE_CHOICES, index=None, format_func=lambda value: __import__("awareml.studies.task_context_revision",fromlist=["SCOPE_LABELS"]).SCOPE_LABELS[value], key="p16v3_scope_basis_"+str(order))
+    if st.button("Submit final response and continue", type="primary", use_container_width=True, key="p16v3_submit_"+str(order)):
         if decision is None: st.error("Choose Accept, Override or Reject."); return
-        try: study.final_submit(ph, order, decision, time.time()-float(st.session_state[start_key]), targets, correction, mode)
+        try: study.final_submit(ph, order, decision, time.time()-float(st.session_state[start_key]), targets, correction, mode, explanation_action=explanation_action, explanation_targets=explanation_targets, explanation_correction=explanation_correction, scope_basis=scope_basis)
         except Exception as exc: st.error(str(exc)); return
         st.session_state.pop(chat_key, None); st.session_state.pop(start_key, None); st.rerun()
 
@@ -416,7 +436,7 @@ def _researcher_visuals(study: TrustCalibrationStudyV2, mode: str, summary: dict
             fig.update_xaxes(range=[1,7], title="Mean trust in incorrect explanations")
             fig.update_yaxes(range=[1,7], title="Mean trust in correct explanations", scaleanchor="x", scaleratio=1)
             fig.update_layout(legend=dict(orientation="h", y=1.08))
-            _chart(fig, "p16v22_calibration_map", 500)
+            _chart(fig, "p16v32_calibration_map", 500)
             st.caption("Points above the diagonal indicate higher trust in correct than incorrect explanations for the same participant.")
 
         left, right = st.columns(2)
@@ -433,7 +453,7 @@ def _researcher_visuals(study: TrustCalibrationStudyV2, mode: str, summary: dict
                     hovertemplate=label+"<br>Trust %{y:.2f}<extra></extra>",
                 ))
             fig.update_yaxes(range=[1,7], dtick=1, title="S-TIAS mean trust")
-            _chart(fig, "p16v22_condition_distribution", 390)
+            _chart(fig, "p16v32_condition_distribution", 390)
         with right:
             st.markdown("#### Perceived factual correctness by actual condition")
             fig = go.Figure()
@@ -447,7 +467,7 @@ def _researcher_visuals(study: TrustCalibrationStudyV2, mode: str, summary: dict
                     hovertemplate=label+"<br>Perceived correctness %{y:.0f}/7<extra></extra>",
                 ))
             fig.update_yaxes(range=[1,7], dtick=1, title="Perceived factual correctness (1–7)")
-            _chart(fig, "p16v22_correctness_detection", 390)
+            _chart(fig, "p16v32_correctness_detection", 390)
 
     with tabs[1]:
         st.markdown("#### S-TIAS item profile by correctness")
@@ -483,7 +503,7 @@ def _researcher_visuals(study: TrustCalibrationStudyV2, mode: str, summary: dict
                         hovertemplate="%{customdata[0]} mean %{x:.2f}<br>n=%{customdata[1]}<extra></extra>",
                     ))
             fig.update_xaxes(range=[1,7], dtick=1, title="Mean item rating")
-            _chart(fig, "p16v22_stias_items", 360)
+            _chart(fig, "p16v32_stias_items", 360)
 
         st.markdown("#### Explanation type × trust discrimination")
         rows=[]
@@ -514,7 +534,7 @@ def _researcher_visuals(study: TrustCalibrationStudyV2, mode: str, summary: dict
                 ))
             fig.add_vline(x=4,line_dash="dot",line_color="#94A3B8")
             fig.update_xaxes(range=[1,7], title="Mean trust")
-            _chart(fig, "p16v22_type_discrimination", 420)
+            _chart(fig, "p16v32_type_discrimination", 420)
 
         if not paired.empty:
             st.markdown("#### Participant calibration-gap distribution")
@@ -525,7 +545,7 @@ def _researcher_visuals(study: TrustCalibrationStudyV2, mode: str, summary: dict
             ))
             fig.add_vline(x=0,line_dash="dash",line_color="#94A3B8")
             fig.update_xaxes(title="Within-participant trust gap", zeroline=False)
-            _chart(fig, "p16v22_gap_distribution", 300)
+            _chart(fig, "p16v32_gap_distribution", 300)
 
     with tabs[2]:
         st.markdown("#### Accept / Override / Reject by correctness")
@@ -546,7 +566,7 @@ def _researcher_visuals(study: TrustCalibrationStudyV2, mode: str, summary: dict
                 ))
             fig.update_layout(barmode="stack",legend=dict(orientation="h",y=1.12))
             fig.update_xaxes(range=[0,100],title="Share of decisions (%)")
-            _chart(fig,"p16v22_decisions",350)
+            _chart(fig,"p16v32_decisions",350)
 
         c1,c2=st.columns(2)
         with c1:
@@ -557,7 +577,7 @@ def _researcher_visuals(study: TrustCalibrationStudyV2, mode: str, summary: dict
                 if g.empty: continue
                 fig.add_trace(go.Box(y=g["trust_rating"],name=action,boxpoints="all",jitter=.25,pointpos=0,boxmean=True))
             fig.update_yaxes(range=[1,7],dtick=1,title="S-TIAS mean trust")
-            _chart(fig,"p16v22_trust_by_action",360)
+            _chart(fig,"p16v32_trust_by_action",360)
         with c2:
             st.markdown("#### Optional evidence questions by final action")
             fig=go.Figure()
@@ -566,7 +586,7 @@ def _researcher_visuals(study: TrustCalibrationStudyV2, mode: str, summary: dict
                 if g.empty: continue
                 fig.add_trace(go.Box(y=g["evidence_question_count"],name=action,boxpoints="all",jitter=.25,pointpos=0,boxmean=True))
             fig.update_yaxes(title="Evidence questions / trial",rangemode="tozero")
-            _chart(fig,"p16v22_questions_by_action",360)
+            _chart(fig,"p16v32_questions_by_action",360)
 
         overrides=analysis_rows[analysis_rows["decision_action"].eq("Override")]
         if not overrides.empty and "override_targets_json" in overrides:
@@ -581,7 +601,7 @@ def _researcher_visuals(study: TrustCalibrationStudyV2, mode: str, summary: dict
                 frame=pd.DataFrame([{"Target":k,"Count":v} for k,v in counter.items()]).sort_values("Count")
                 fig=go.Figure(go.Bar(x=frame["Count"],y=frame["Target"],orientation="h",text=frame["Count"],textposition="outside"))
                 fig.update_xaxes(title="Override selections",dtick=1)
-                _chart(fig,"p16v22_override_targets",360)
+                _chart(fig,"p16v32_override_targets",360)
             complete_text=overrides.get("override_correction_text",pd.Series(dtype=object)).fillna("").astype(str).str.strip().ne("")
             st.caption("Structured correction text captured for {} of {} overrides.".format(int(complete_text.sum()),len(overrides)))
 
@@ -594,7 +614,7 @@ def _researcher_visuals(study: TrustCalibrationStudyV2, mode: str, summary: dict
                 z=heat.values,x=["Correct","Incorrect"],y=heat.index.tolist(),text=heat.values,texttemplate="%{text}",
                 colorscale="Blues",showscale=False,hovertemplate="%{y}<br>%{x}: %{z}<extra></extra>"
             ))
-            _chart(fig,"p16v22_pair_heat",max(480,20*len(heat)+120))
+            _chart(fig,"p16v32_pair_heat",max(480,20*len(heat)+120))
 
             st.markdown("#### Scenario evaluation counts")
             scenario=pair[["scenario_id","evaluations","framework","source_stage"]].sort_values("evaluations")
@@ -605,7 +625,7 @@ def _researcher_visuals(study: TrustCalibrationStudyV2, mode: str, summary: dict
                 hovertemplate="Scenario %{y}<br>Evaluations %{x}<br>Framework %{customdata[0]}<br>Type %{customdata[1]}<extra></extra>",
             ))
             fig.update_xaxes(title="Completed evaluations")
-            _chart(fig,"p16v22_scenario_counts",max(460,20*len(scenario)+120))
+            _chart(fig,"p16v32_scenario_counts",max(460,20*len(scenario)+120))
 
         st.markdown("#### Framework × explanation-type observation matrix")
         matrix=analysis_rows.groupby(["framework_context","source_stage"]).size().unstack(fill_value=0)
@@ -617,7 +637,7 @@ def _researcher_visuals(study: TrustCalibrationStudyV2, mode: str, summary: dict
                 colorscale="Blues",showscale=False,
                 hovertemplate="Framework %{y}<br>Explanation type %{x}<br>Trials %{z}<extra></extra>"
             ))
-            _chart(fig,"p16v22_framework_type",360)
+            _chart(fig,"p16v32_framework_type",360)
 
         if not participants.empty and "counterbalance_arm" in participants:
             arms=participants[participants["participant_hash"].astype(str).isin(completed_hashes)]["counterbalance_arm"].fillna("Unknown").value_counts()
@@ -625,7 +645,7 @@ def _researcher_visuals(study: TrustCalibrationStudyV2, mode: str, summary: dict
                 st.markdown("#### Counterbalance-arm completion")
                 fig=go.Figure(go.Bar(x=arms.index,y=arms.values,text=arms.values,textposition="outside"))
                 fig.update_yaxes(title="Completed participants",dtick=1)
-                _chart(fig,"p16v22_counterbalance",280)
+                _chart(fig,"p16v32_counterbalance",280)
 
     with tabs[4]:
         st.markdown("#### Trial-position trajectories")
@@ -647,7 +667,7 @@ def _researcher_visuals(study: TrustCalibrationStudyV2, mode: str, summary: dict
             fig.update_yaxes(title_text="Questions",rangemode="tozero",row=3,col=1)
             fig.update_xaxes(title_text="Trial position (1–20)",dtick=1,row=3,col=1)
             fig.update_layout(showlegend=False)
-            _chart(fig,"p16v22_trial_dynamics",650)
+            _chart(fig,"p16v32_trial_dynamics",650)
 
         st.markdown("#### Evidence-seeking intensity by explanation type and correctness")
         qmatrix=analysis_rows.pivot_table(index="source_stage",columns="correctness_condition",values="evidence_question_count",aggfunc="mean")
@@ -662,7 +682,7 @@ def _researcher_visuals(study: TrustCalibrationStudyV2, mode: str, summary: dict
                 text=[["{:.2f}".format(v) for v in row] for row in qmatrix.values],texttemplate="%{text}",
                 colorscale="Blues",colorbar=dict(title="Mean\nquestions"),
             ))
-            _chart(fig,"p16v22_question_heat",360)
+            _chart(fig,"p16v32_question_heat",360)
 
         if not events.empty:
             qevents=events[events["event_type"].eq("evidence_question")]
@@ -711,7 +731,7 @@ def _researcher_visuals(study: TrustCalibrationStudyV2, mode: str, summary: dict
                 fig.update_layout(barmode="stack",legend=dict(orientation="h",y=1.12,title="Rating"))
                 fig.update_xaxes(range=[0,100],title="Response share (%)")
                 fig.update_yaxes(categoryorder="array",categoryarray=list(reversed(order_items)))
-                _chart(fig,"p16v22_human_agency_likert",520)
+                _chart(fig,"p16v32_human_agency_likert",520)
 
                 means=ldf.groupby("Short item")["Rating"].agg(["mean","std","count"]).reindex(order_items).reset_index()
                 fig=go.Figure(go.Scatter(
@@ -723,7 +743,7 @@ def _researcher_visuals(study: TrustCalibrationStudyV2, mode: str, summary: dict
                 ))
                 fig.add_vline(x=4,line_dash="dot",line_color="#94A3B8")
                 fig.update_xaxes(range=[1,7],dtick=1,title="Mean response (1–7)")
-                _chart(fig,"p16v22_human_agency_means",460)
+                _chart(fig,"p16v32_human_agency_means",460)
                 comments=secondary.get("open_comment",pd.Series(dtype=object)).fillna("").astype(str).str.strip().ne("")
                 st.caption("Open-text reflection provided by {} of {} completed questionnaires.".format(int(comments.sum()),len(secondary)))
 
@@ -746,7 +766,7 @@ def _researcher_visuals(study: TrustCalibrationStudyV2, mode: str, summary: dict
             fig.update_xaxes(range=[0.5,7.5],dtick=1,title="Self-rated ML / AutoML knowledge and experience")
             fig.update_yaxes(title="Correct − incorrect mean trust")
             fig.update_layout(legend=dict(orientation="h",y=1.12))
-            _chart(fig,"p16v22_expertise_gap",420)
+            _chart(fig,"p16v32_expertise_gap",420)
 
         exp=pd.DataFrame(summary.get("expertise_descriptive") or [])
         if not exp.empty:
@@ -760,7 +780,7 @@ def _researcher_visuals(study: TrustCalibrationStudyV2, mode: str, summary: dict
             ))
             fig.add_vline(x=4,line_dash="dot",line_color="#94A3B8")
             fig.update_xaxes(range=[1,7],dtick=1,title="Mean trust")
-            _chart(fig,"p16v22_expertise_mean",340)
+            _chart(fig,"p16v32_expertise_mean",340)
         st.caption("Expertise analyses are descriptive secondary analyses; the study is not powered for confirmatory between-group comparisons.")
 
 def _researcher(study: TrustCalibrationStudyV2, mode: str):
@@ -780,13 +800,27 @@ def _researcher(study: TrustCalibrationStudyV2, mode: str):
 
     summary = analyze_v2(study.store, mode)
     protocol = study.protocol
-    st.success("Researcher workspace · Morten-review v2.1")
+    st.success("Researcher workspace · Morten-review v3")
+    section("Exact stimulus assessor review", "Review the same scenario, task, recommendation, explanation and table shown to participants. Historical objective annotations are not explanation reviews.")
+    status = review_status()
+    st.write("Reviewed items: {} / {}".format(status['reviewed_items'], status['required_items']))
+    if not status['ready']:
+        st.info("Final collection awaits two independent complete reviews of each exact stimulus. Launch assessor_review_app.py and export each assessor CSV; do not fill templates with generated labels.")
+    st.download_button("Download blank assessor template CSV", review_template().to_csv(index=False).encode(), file_name="blank_exact_stimulus_review.csv", mime="text/csv")
+    upload=st.file_uploader("Import completed assessor CSV",type=["csv"],key="v3_assessor_upload")
+    if upload is not None and st.button("Validate and store assessor review",key="v3_import_review"):
+        try:
+            result=store_reviews(pd.read_csv(upload,keep_default_na=False));st.write(result);st.rerun()
+        except Exception as exc:st.error(str(exc))
+    with st.expander("Review status details"):
+        st.json(status)
+
 
     section("Study readiness", "Protocol, instrument, design lock and collection target are visible before inspecting responses.")
     ready=st.columns(6)
-    ready[0].metric("Protocol", "Final")
+    ready[0].metric("Protocol", "v3 revision")
     ready[1].metric("Trust measure", "S-TIAS · 3 items")
-    ready[2].metric("Design lock", "Locked")
+    ready[2].metric("Human review", "Complete" if status["ready"] else "Pending")
     ready[3].metric("Scenario coherence", "20 / 20")
     ready[4].metric("Counterbalance", "A / B")
     ready[5].metric("Main target", "34 · recruit ≤40")
@@ -818,6 +852,15 @@ def _researcher(study: TrustCalibrationStudyV2, mode: str):
     section("Research-grade descriptive views", "High-resolution descriptive diagnostics cover calibration, reliance, scenario coverage, trial dynamics, human agency and expertise while keeping inferential claims separate from exploration.")
     _researcher_visuals(study, mode, summary)
 
+    section("Recommendation and explanation interpretation", "Recommendation correctness is held constant in v3. Accepting the recommendation when its explanation is incorrect is not automatically overreliance.")
+    st.json({k:summary.get(k) for k in ["primary_inference","evidence_association","agency_evidence_association","explanation_action_by_condition","explanation_overreliance_rate","supported_explanation_nonuse_rate","scope_basis_counts"]}, expanded=False)
+    section("Full 60-scenario exposure audit", "Twenty fixed scenarios are included; the other forty have zero observations. This study does not revalidate all sixty Track-1 objective interpretations.")
+    coverage=pd.DataFrame(summary.get("all_scenario_coverage") or [])
+    st.dataframe(coverage,hide_index=True,use_container_width=True)
+    if not coverage.empty:
+        st.caption("Full-bank observed range: {}–{}. Fixed-subset expected count per scenario is N; full-bank average is N × 20 / 60.".format(coverage.evaluations.min(),coverage.evaluations.max()))
+        st.download_button("Download full scenario exposure CSV",coverage.to_csv(index=False).encode(),file_name="full_60_scenario_exposure.csv",mime="text/csv")
+    st.download_button("Download v3 analysis JSON", __import__('json').dumps(summary,indent=2,default=str).encode(),file_name="trust_v3_analysis.json",mime="application/json")
     section("Trial-family exposure audit", "This is the scenario/pair evaluation count requested for journal reporting.")
     pair=pd.DataFrame(summary.get("pair_coverage") or [])
     if pair.empty:
@@ -842,19 +885,25 @@ def _researcher(study: TrustCalibrationStudyV2, mode: str):
 def phase16_trust_calibration_page_v2():
     _css(); mode = _mode(); role = str(st.session_state.get(ROLE_KEY) or "")
     if role == "participant":
-        if st.button("Exit study view", key="p16v2_exit"): st.session_state.pop(ROLE_KEY,None); st.rerun()
+        if st.button("Exit study view", key="p16v3_exit"): st.session_state.pop(ROLE_KEY,None); st.rerun()
         render_phase16_participant_study(collection_mode=mode, dashboard_embedded=True); return
-    hero("HUMAN STUDY · CALIBRATED RELIANCE", "Trust Calibration", "Morten-review v2.1: scenario → task → explanation → evidence coherence, complete five-framework reference evidence, explicit ratings, evidence seeking and actionable Override.", pills=[("20 scenarios","good"),("5 frameworks","good"),("10 correct + 10 incorrect","good"),("Counterbalanced","good")])
+    hero("HUMAN STUDY · CALIBRATED RELIANCE", "Trust Calibration", "Morten-review v3: scenario → task → explanation → evidence coherence, complete five-framework reference evidence, explicit ratings, evidence seeking and actionable Override.", pills=[("20 scenarios","good"),("5 frameworks","good"),("10 correct + 10 incorrect","good"),("Counterbalanced","good")])
     try:
         study = TrustCalibrationStudyV2()
-        if mode == "final": study.assert_final_ready()
     except Exception as exc: st.error(str(exc)); return
     if role == "researcher":
-        if st.button("Back to study home", key="p16v2_back_researcher"): st.session_state.pop(ROLE_KEY,None); st.rerun()
+        if st.button("Back to study home", key="p16v3_back_researcher"): st.session_state.pop(ROLE_KEY,None); st.rerun()
         _researcher(study, mode); return
+    readiness_error = None
+    if mode == "final":
+        try:
+            study.assert_final_ready()
+        except Exception as exc:
+            readiness_error = str(exc)
+            st.warning("Main Study participant access is pending: {} Open the researcher workspace below to import assessor reviews.".format(readiness_error))
     st.markdown('<div class="m2-context"><b>Revised study logic.</b> Every participant receives all 20 matched trial families exactly once: five frameworks × four coherent explanation forms, each attached to a unique Track-1 scenario. The task is derived from that scenario&#39;s Accuracy/Runtime/Energy/CO₂ priorities. Correctness is blinded; counterbalance arms complement the correct/incorrect variant shown for each pair.</div>', unsafe_allow_html=True)
     c1,c2 = st.columns(2)
-    if c1.button("Enter participant study", type="primary", use_container_width=True, key="p16v2_enter_p"): st.session_state[ROLE_KEY] = "participant"; st.rerun()
-    if c2.button("Open researcher workspace", use_container_width=True, key="p16v2_enter_r"): st.session_state[ROLE_KEY] = "researcher"; st.rerun()
+    if c1.button("Enter participant study", type="primary", use_container_width=True, key="p16v3_enter_p", disabled=readiness_error is not None): st.session_state[ROLE_KEY] = "participant"; st.rerun()
+    if c2.button("Open researcher workspace", use_container_width=True, key="p16v3_enter_r"): st.session_state[ROLE_KEY] = "researcher"; st.rerun()
     cards = st.columns(5)
     for col,(label,value) in zip(cards,[("Trials / participant","20"),("Track-1 scenarios","20 unique"),("Framework coverage","4 trials each"),("Required complete","34"),("Recruit up to","40")]): col.metric(label,value)

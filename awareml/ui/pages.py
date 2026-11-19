@@ -1,4 +1,5 @@
 from __future__ import annotations
+from awareml.ui_v2.framework_labels import framework_label, framework_description, display_labels, display_frame, display_figure
 
 import os
 import time
@@ -64,7 +65,7 @@ def _plot(fig, key: str, height: int | None = None):
     if height:
         fig.update_layout(height=height)
     st.plotly_chart(
-        fig,
+        display_figure(fig),
         use_container_width=True,
         key=key,
         config={"displaylogo": False, "responsive": True},
@@ -205,7 +206,7 @@ def overview_page():
 
     if _results():
         st.markdown('<div class="section-title">Current backend provenance</div>', unsafe_allow_html=True)
-        st.dataframe(_results_df()[["Framework", "Backend", "Accuracy", "Runtime (s)"]], use_container_width=True, hide_index=True)
+        st.dataframe(display_frame(_results_df()[["Framework", "Backend", "Accuracy", "Runtime (s)"]]), use_container_width=True, hide_index=True)
 
 
 def run_studio_page():
@@ -453,7 +454,7 @@ def run_studio_page():
             ["AutoStreamML", "AutoClass", "EvoAutoML", "OAML", "ChaCha"],
             default=["AutoStreamML", "AutoClass", "EvoAutoML", "OAML", "ChaCha"],
             key="run_frameworks",
-        )
+         format_func=framework_label)
 
         with st.expander("Framework algorithms & hyperparameters", expanded=False):
             framework_configs = render_framework_configuration(
@@ -517,9 +518,9 @@ def run_studio_page():
         st.subheader("Stream evidence preview")
         df = _state().get("dataset")
         if df is not None:
-            preview_tab, profile_tab = st.tabs(["Stream preview", "Dataset diagnostics"])
+            preview_tab, profile_tab = st.tabs(display_labels(["Stream preview", "Dataset diagnostics"]))
             with preview_tab:
-                st.dataframe(df.head(12), use_container_width=True, hide_index=True)
+                st.dataframe(display_frame(df.head(12)), use_container_width=True, hide_index=True)
                 if _state().get("target"):
                     fig = px.line(df.head(min(len(df), 1500)).reset_index(), x="index", y=_state()["target"], title="Target over stream order")
                     fig.update_layout(margin=dict(l=10, r=10, t=45, b=10))
@@ -593,7 +594,7 @@ def run_studio_page():
     if _results():
         st.markdown('<div class="section-title">Latest comparison</div>', unsafe_allow_html=True)
         rdf = _results_df()
-        st.dataframe(rdf, use_container_width=True, hide_index=True)
+        st.dataframe(display_frame(rdf), use_container_width=True, hide_index=True)
         c_left, c_right = st.columns([1, 1])
         with c_left:
             fig = px.bar(rdf, x="Framework", y="Accuracy", color="Framework", text_auto=".3f", title="Current-run prequential accuracy")
@@ -688,13 +689,13 @@ def drift_temporal_page():
     sdf = pd.DataFrame(summary)
     a, b, c, d, e = st.columns(5)
     best = sdf.sort_values("Final accuracy", ascending=False).iloc[0]
-    a.metric("Best final accuracy", f"{best['Framework']} · {best['Final accuracy']:.3f}")
-    b.metric("Total detected drifts", int(sdf["Drifts"].sum()))
+    a.metric(framework_label("Best final accuracy"), framework_label(f"{best['Framework']} · {best['Final accuracy']:.3f}"))
+    b.metric(framework_label("Total detected drifts"), framework_label(int(sdf["Drifts"].sum())))
     recovered = pd.to_numeric(sdf["Recovery rate"], errors="coerce").dropna()
-    c.metric("Mean drift recovery", f"{recovered.mean():.2f}" if not recovered.empty else "N/A")
+    c.metric(framework_label("Mean drift recovery"), framework_label(f"{recovered.mean():.2f}" if not recovered.empty else "N/A"))
     p95 = pd.to_numeric(sdf["p95 latency (ms)"], errors="coerce").dropna()
-    d.metric("Median p95 latency", f"{p95.median():.2f} ms" if not p95.empty else "N/A")
-    e.metric("Shared protocol", "Test→train")
+    d.metric(framework_label("Median p95 latency"), framework_label(f"{p95.median():.2f} ms" if not p95.empty else "N/A"))
+    e.metric(framework_label("Shared protocol"), framework_label("Test→train"))
 
     timeline = pd.DataFrame(timeline_rows)
     if not timeline.empty:
@@ -719,7 +720,7 @@ def drift_temporal_page():
 
     left, right = st.columns([1.3, 1])
     with left:
-        st.dataframe(sdf, use_container_width=True, hide_index=True)
+        st.dataframe(display_frame(sdf), use_container_width=True, hide_index=True)
     with right:
         drift_df = sdf[["Framework", "Drifts"]].copy()
         fig = px.bar(drift_df, x="Framework", y="Drifts", color="Framework", title="Detected drift events")
@@ -776,16 +777,16 @@ def decision_lab_page():
 
     top = recs[0]
     a, b, c = st.columns([1.2, 1, 1])
-    a.metric("Recommended framework", top.framework)
-    b.metric("Weighted utility", f"{top.utility:.3f}")
-    c.metric("Near-Pareto", "Yes" if top.near_pareto else "No")
+    a.metric(framework_label("Recommended framework"), framework_label(top.framework))
+    b.metric(framework_label("Weighted utility"), framework_label(f"{top.utility:.3f}"))
+    c.metric(framework_label("Near-Pareto"), framework_label("Yes" if top.near_pareto else "No"))
     for warning in warnings:
         st.warning(warning)
 
     left, right = st.columns([1.45, 1])
     with left:
         show = frame.rename(columns={"framework": "Framework", "utility": "Utility", "near_pareto": "Near-Pareto", "rank": "Rank", "fairness_score": "Fairness score"})
-        st.dataframe(show, use_container_width=True, hide_index=True)
+        st.dataframe(display_frame(show), use_container_width=True, hide_index=True)
         fig = px.scatter(frame, x="accuracy", y="fairness_score", size="utility", color="framework", hover_data=["runtime_sec", "near_pareto"], title=f"Accuracy / fairness trade-off · {fairness_label}")
         fig.update_layout(margin=dict(l=10, r=10, t=45, b=10))
         _plot(fig, "decision_accuracy_fairness", 390)
@@ -802,7 +803,7 @@ def decision_lab_page():
     for r in _result_dicts():
         ci = (r.get("uncertainty") or {}).get("window_accuracy", {})
         unc_rows.append([r["framework"], ci.get("mean"), ci.get("lower"), ci.get("upper"), ci.get("n")])
-    st.dataframe(pd.DataFrame(unc_rows, columns=["Framework", "Window mean", "95% CI lower", "95% CI upper", "Windows"]), use_container_width=True, hide_index=True)
+    st.dataframe(display_frame(pd.DataFrame(unc_rows, columns=["Framework", "Window mean", "95% CI lower", "95% CI upper", "Windows"])), use_container_width=True, hide_index=True)
 
 
 def fairness_page():
@@ -848,12 +849,12 @@ def fairness_page():
 
     a, b, c, d = st.columns(4)
     if best_idx is not None:
-        a.metric("Lowest mean disparity", fair_df.loc[best_idx, "Framework"], _metric_text(mean_gap.loc[best_idx], 3))
+        a.metric(framework_label("Lowest mean disparity"), framework_label(fair_df.loc[best_idx, "Framework"]), _metric_text(mean_gap.loc[best_idx], 3))
     else:
-        a.metric("Lowest mean disparity", "N/A")
-    b.metric("Metric coverage", f"{coverage_n}/{coverage_total}")
-    c.metric("Sensitive attribute", str(_state().get("sensitive")))
-    d.metric("Fairness window", str(next((r.get("fairness", {}).get("window_n") for r in results if r.get("fairness")), "N/A")))
+        a.metric(framework_label("Lowest mean disparity"), framework_label("N/A"))
+    b.metric(framework_label("Metric coverage"), framework_label(f"{coverage_n}/{coverage_total}"))
+    c.metric(framework_label("Sensitive attribute"), framework_label(str(_state().get("sensitive"))))
+    d.metric(framework_label("Fairness window"), framework_label(str(next((r.get("fairness", {}).get("window_n") for r in results if r.get("fairness")), "N/A"))))
 
     long = fair_df.melt(id_vars=["Framework", "Status", "Window N"], value_vars=metric_cols, var_name="Fairness metric", value_name="Gap").dropna()
     left, right = st.columns([1.35, 1])
@@ -914,7 +915,7 @@ def fairness_page():
         fig.update_layout(hovermode="x unified")
         _plot(fig, "fairness_temporal_selected", 390)
         worst = tmp.groupby("Framework")["Gap"].max().sort_values(ascending=False).rename("Worst-window gap").reset_index()
-        st.dataframe(worst, use_container_width=True, hide_index=True)
+        st.dataframe(display_frame(worst), use_container_width=True, hide_index=True)
 
         summary_key = {v: k for k, v in point_keys.items()}.get(selected_metric)
         summary_rows = []
@@ -933,10 +934,10 @@ def fairness_page():
                     })
         if summary_rows:
             st.caption("Phase-3 temporal aggregation (missing windows remain missing; they are never converted to zero).")
-            st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
+            st.dataframe(display_frame(pd.DataFrame(summary_rows)), use_container_width=True, hide_index=True)
 
-    st.markdown('<div class="section-title">Framework detail</div>', unsafe_allow_html=True)
-    tabs = st.tabs([r["framework"] for r in results])
+    st.markdown(framework_label('<div class="section-title">Framework detail</div>'), unsafe_allow_html=True)
+    tabs = st.tabs(display_labels([r["framework"] for r in results]))
     for idx, (tab, r) in enumerate(zip(tabs, results)):
         with tab:
             f = r.get("fairness", {}) or {}
@@ -947,7 +948,7 @@ def fairness_page():
                 ("Error gap", f.get("error_rate_gap")),
             ]
             for c, (lab, val) in zip(cols, vals):
-                c.metric(lab, _metric_text(val, 3))
+                c.metric(framework_label(lab), framework_label(_metric_text(val, 3)))
             support = f.get("groups", {}) or {}
             st.caption(f"Status: {f.get('status')} · recent window: {f.get('window_n', 'N/A')} · group support: {support}")
             pred_diag = r.get("prediction_diagnostics", {}) or {}
@@ -981,14 +982,14 @@ def explainability_page():
     if status.get("reachable"):
         st.caption("Local Ollama is available for grounded explanation summaries. Raw dataset rows are not sent by default.")
 
-    model_tab, hp_tab, system_tab = st.tabs([
+    model_tab, hp_tab, system_tab = st.tabs(display_labels([
         "Model-level explanations",
         "Hyperparameter-level context",
         "System-level explainability",
-    ])
+    ]))
 
     with model_tab:
-        framework = st.selectbox("Framework", [r["framework"] for r in results], key="xai_model_framework")
+        framework = st.selectbox("Framework", [r["framework"] for r in results], key="xai_model_framework", format_func=framework_label)
         r = next(x for x in results if x["framework"] == framework)
         e = r.get("explainability", {}) or {}
         if e.get("status") == "failed":
@@ -997,23 +998,23 @@ def explainability_page():
             st.warning("No requested XAI method produced a non-degenerate explanation signal. AwareML does not display all-zero importance as a valid explanation.")
             attempts = e.get("method_attempts", []) or []
             if attempts:
-                st.dataframe(pd.DataFrame(attempts), use_container_width=True, hide_index=True)
+                st.dataframe(display_frame(pd.DataFrame(attempts)), use_container_width=True, hide_index=True)
         elif e.get("status") != "ok":
             st.info("Explanation diagnostics require at least 30 recent labeled observations.")
         else:
             a, b, c, d, ee = st.columns(5)
-            a.metric("Stability", _metric_text(e.get("stability"), 3))
-            b.metric("Consistency", _metric_text(e.get("consistency"), 3))
-            c.metric("Sensitivity ↓", _metric_text(e.get("sensitivity"), 3))
-            d.metric("Deletion fidelity", _metric_text(e.get("fidelity"), 3))
-            ee.metric("Sparsity", _metric_text(e.get("sparsity"), 3))
+            a.metric(framework_label("Stability"), framework_label(_metric_text(e.get("stability"), 3)))
+            b.metric(framework_label("Consistency"), framework_label(_metric_text(e.get("consistency"), 3)))
+            c.metric(framework_label("Sensitivity ↓"), framework_label(_metric_text(e.get("sensitivity"), 3)))
+            d.metric(framework_label("Deletion fidelity"), framework_label(_metric_text(e.get("fidelity"), 3)))
+            ee.metric(framework_label("Sparsity"), framework_label(_metric_text(e.get("sparsity"), 3)))
             st.caption(f"Method actually used: {e.get('method', 'N/A')} · model backend: {r.get('backend')}")
             if e.get("replay_warning"):
                 st.warning(e.get("replay_warning"))
             attempts = e.get("method_attempts", []) or []
             if attempts:
                 with st.expander("XAI method audit trail", expanded=False):
-                    st.dataframe(pd.DataFrame(attempts), use_container_width=True, hide_index=True)
+                    st.dataframe(display_frame(pd.DataFrame(attempts)), use_container_width=True, hide_index=True)
                     if e.get("method_metadata"):
                         st.json(e.get("method_metadata"))
 
@@ -1028,7 +1029,7 @@ def explainability_page():
                 if not imp.empty:
                     top_table = imp.head(12).copy()
                     top_table["rank"] = np.arange(1, len(top_table) + 1)
-                    st.dataframe(top_table[["rank", "feature", "importance"]], use_container_width=True, hide_index=True)
+                    st.dataframe(display_frame(top_table[["rank", "feature", "importance"]]), use_container_width=True, hide_index=True)
                 base = e.get("base_accuracy_on_explanation_window")
                 reference = e.get("prequential_reference_accuracy")
                 replay_gap = e.get("replay_accuracy_gap")
@@ -1057,16 +1058,16 @@ def explainability_page():
     with hp_tab:
         st.markdown("### Hyperparameter-level context")
         st.caption(
-            "The previous dashboard exposed hyperparameter values and tuning narratives. This extension preserves that layer, but does not label a single final configuration as temporal 'evolution' unless a framework actually records its tuning history."
+            framework_label("The previous dashboard exposed hyperparameter values and tuning narratives. This extension preserves that layer, but does not label a single final configuration as temporal 'evolution' unless a framework actually records its tuning history.")
         )
         scope = st.segmented_control("Scope", ["Single framework", "All frameworks"], default="Single framework", key="xai_hp_scope")
-        selected = st.selectbox("Framework", [r["framework"] for r in results], key="xai_hp_fw") if scope == "Single framework" else None
+        selected = st.selectbox("Framework", [r["framework"] for r in results], key="xai_hp_fw", format_func=framework_label) if scope == "Single framework" else None
         chosen = [r for r in results if selected is None or r["framework"] == selected]
         for idx, r in enumerate(chosen):
             params = r.get("parameters", {}) or {}
-            st.markdown(f"#### {r['framework']}")
+            st.markdown(framework_label(f"#### {r['framework']}"))
             if not params:
-                st.info("No framework parameters were exposed for this run.")
+                st.info(framework_label("No framework parameters were exposed for this run."))
                 continue
             flat = []
             for k, v in params.items():
@@ -1076,7 +1077,7 @@ def explainability_page():
                 else:
                     flat.append({"Parameter": k, "Value": v})
             pdf = pd.DataFrame(flat)
-            st.dataframe(pdf, use_container_width=True, hide_index=True)
+            st.dataframe(display_frame(pdf), use_container_width=True, hide_index=True)
             numeric = []
             for row in flat:
                 try:
@@ -1091,7 +1092,7 @@ def explainability_page():
         st.warning("To make this a true hyperparameter-evolution study, the runner should log parameter changes per adaptation window together with the resulting performance/fairness/energy delta. Phase 3 keeps the UI scientifically honest until that trace exists.")
 
     with system_tab:
-        st.markdown("### Cross-framework explanation agreement")
+        st.markdown(framework_label("### Cross-framework explanation agreement"))
         diag_rows = []
         feature_maps = {}
         for r in results:
@@ -1169,12 +1170,12 @@ def sustainability_page():
     measured_energy = sdf["Energy kWh"].notna().sum()
     measured_co2 = sdf["CO2 kg"].notna().sum()
     a, b, c, d = st.columns(4)
-    a.metric("Energy measured", f"{measured_energy}/{len(sdf)}")
-    b.metric("CO₂ measured", f"{measured_co2}/{len(sdf)}")
-    c.metric("Total measured energy", _metric_text(pd.to_numeric(sdf["Energy kWh"], errors="coerce").sum(min_count=1), 6, " kWh"))
-    d.metric("Total measured CO₂", _metric_text(pd.to_numeric(sdf["CO2 kg"], errors="coerce").sum(min_count=1), 6, " kg"))
+    a.metric(framework_label("Energy measured"), framework_label(f"{measured_energy}/{len(sdf)}"))
+    b.metric(framework_label("CO₂ measured"), framework_label(f"{measured_co2}/{len(sdf)}"))
+    c.metric(framework_label("Total measured energy"), framework_label(_metric_text(pd.to_numeric(sdf["Energy kWh"], errors="coerce").sum(min_count=1), 6, " kWh")))
+    d.metric(framework_label("Total measured CO₂"), framework_label(_metric_text(pd.to_numeric(sdf["CO2 kg"], errors="coerce").sum(min_count=1), 6, " kg")))
 
-    st.dataframe(sdf, use_container_width=True, hide_index=True)
+    st.dataframe(display_frame(sdf), use_container_width=True, hide_index=True)
     measured = sdf.dropna(subset=["Energy kWh", "CO2 kg"], how="all")
     if measured.empty:
         st.warning("This run contains no measured energy/CO₂ values. Re-run from Run Studio with CodeCarbon measurement enabled and inspect the diagnostics below.")
@@ -1212,20 +1213,20 @@ def sustainability_page():
     with st.expander("Measurement diagnostics", expanded=False):
         for r in _result_dicts():
             s = r.get("sustainability", {}) or {}
-            st.markdown(f"**{r['framework']} — {s.get('status')}**")
+            st.markdown(framework_label(f"**{r['framework']} — {s.get('status')}**"))
             notes = s.get("notes") or ["No diagnostic notes recorded."]
             for note in notes:
                 st.caption(f"• {note}")
 
     st.subheader("Paper-grade protocol checklist")
-    st.markdown("""
+    st.markdown(framework_label("""
 - Use one warm-up plus at least five measured repetitions for reported energy/CO₂ claims.
 - Keep machine, sample cap and time budget fixed across frameworks within a comparison.
 - Record CPU/GPU, RAM, OS, Python, CodeCarbon version, region and run timestamp.
 - Report mean, standard deviation, median and bootstrap 95% confidence interval across repetitions.
 - Test energy/CO₂ correlation before assigning both large independent utility weights.
 - Separate runtime efficiency from regional carbon-intensity effects.
-""")
+"""))
 
 
 def recommender_lab_page():
@@ -1249,10 +1250,10 @@ def recommender_lab_page():
     profile = profile_from_dataframe(df, target)
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Historical meta-runs", f"{coverage.get('rows', 0):,}")
-    c2.metric("Historical datasets", f"{coverage.get('datasets', 0):,}")
-    c3.metric("Energy coverage", f"{coverage.get('energy_coverage', 0.0):.0%}")
-    c4.metric("CO₂ coverage", f"{coverage.get('co2_coverage', 0.0):.0%}")
+    c1.metric(framework_label("Historical meta-runs"), framework_label(f"{coverage.get('rows', 0):,}"))
+    c2.metric(framework_label("Historical datasets"), framework_label(f"{coverage.get('datasets', 0):,}"))
+    c3.metric(framework_label("Energy coverage"), framework_label(f"{coverage.get('energy_coverage', 0.0):.0%}"))
+    c4.metric(framework_label("CO₂ coverage"), framework_label(f"{coverage.get('co2_coverage', 0.0):.0%}"))
 
     if meta_df.empty:
         st.error("No historical meta_logs.json was found in data/meta/ or the project root.")
@@ -1267,17 +1268,17 @@ def recommender_lab_page():
         st.error(f"Historical ML recommender could not be trained: {exc}")
         return
 
-    tab_llm, tab_ml, tab_eval = st.tabs([
+    tab_llm, tab_ml, tab_eval = st.tabs(display_labels([
         "LLM-Assisted Recommender",
         "ML Recommender",
         "Meta-Evidence & Validation",
-    ])
+    ]))
 
     with tab_llm:
         st.markdown("### Natural-language objective → validated evidence ranking")
         st.caption(
-            "The local LLM parses the user's goal; the framework choice is then checked against the historical meta-model. "
-            "If Ollama is unavailable or returns malformed output, the deterministic parser is used."
+            framework_label("The local LLM parses the user's goal; the framework choice is then checked against the historical meta-model. "
+            "If Ollama is unavailable or returns malformed output, the deterministic parser is used.")
         )
         top, controls = st.columns([1.7, 1])
         with controls:
@@ -1316,10 +1317,10 @@ def recommender_lab_page():
             )
             best = cand.iloc[0]
             a, b, c, d = st.columns([1.2, 1, 1, 1])
-            a.metric("Recommended framework", best["framework"])
-            b.metric("Expected accuracy", _metric_text(best.get("accuracy"), 2, "%"))
-            c.metric("Expected runtime", _metric_text(best.get("runtime_sec"), 2, " s"))
-            d.metric("Evidence utility", _metric_text(best.get("utility"), 3))
+            a.metric(framework_label("Recommended framework"), framework_label(best["framework"]))
+            b.metric(framework_label("Expected accuracy"), framework_label(_metric_text(best.get("accuracy"), 2, "%")))
+            c.metric(framework_label("Expected runtime"), framework_label(_metric_text(best.get("runtime_sec"), 2, " s")))
+            d.metric(framework_label("Evidence utility"), framework_label(_metric_text(best.get("utility"), 3)))
             st.markdown(
                 f'<div class="evidence-card"><b>Suggested algorithm:</b> {best.get("algorithm", "N/A")} &nbsp; '
                 f'· <b>closest historical dataset:</b> {best.get("nearest_dataset", "N/A")}<br>'
@@ -1328,7 +1329,7 @@ def recommender_lab_page():
             )
             view = cand[["rank", "framework", "algorithm", "accuracy", "runtime_sec", "energy_kwh", "co2_ug", "utility", "nearest_dataset"]].copy()
             view.columns = ["Rank", "Framework", "Algorithm", "Expected accuracy", "Expected runtime (s)", "Expected energy (kWh)", "Expected CO₂ (µg)", "Utility", "Nearest dataset"]
-            st.dataframe(view, use_container_width=True, hide_index=True)
+            st.dataframe(display_frame(view), use_container_width=True, hide_index=True)
 
             chart = cand[["framework", "accuracy_score", "runtime_score", "energy_score", "co2_score"]].melt(
                 id_vars="framework", var_name="objective", value_name="normalized_score"
@@ -1371,11 +1372,11 @@ def recommender_lab_page():
             cand = pd.DataFrame(rows)
             best = cand.iloc[0]
             a, b, c, d, e = st.columns(5)
-            a.metric("Top framework", best["framework"])
-            b.metric("Accuracy", _metric_text(best.get("accuracy"), 2, "%"))
-            c.metric("Runtime", _metric_text(best.get("runtime_sec"), 2, " s"))
-            d.metric("Energy", _metric_text(best.get("energy_kwh"), 6, " kWh"))
-            e.metric("Utility", _metric_text(best.get("utility"), 3))
+            a.metric(framework_label("Top framework"), framework_label(best["framework"]))
+            b.metric(framework_label("Accuracy"), framework_label(_metric_text(best.get("accuracy"), 2, "%")))
+            c.metric(framework_label("Runtime"), framework_label(_metric_text(best.get("runtime_sec"), 2, " s")))
+            d.metric(framework_label("Energy"), framework_label(_metric_text(best.get("energy_kwh"), 6, " kWh")))
+            e.metric(framework_label("Utility"), framework_label(_metric_text(best.get("utility"), 3)))
 
             left, right = st.columns([1.45, 1])
             with left:
@@ -1393,7 +1394,7 @@ def recommender_lab_page():
                 _plot(fig, "mlrec_heatmap", 390)
 
             st.dataframe(
-                cand[["rank", "framework", "algorithm", "accuracy", "runtime_sec", "energy_kwh", "co2_ug", "utility", "nearest_dataset"]],
+                display_frame(cand[["rank", "framework", "algorithm", "accuracy", "runtime_sec", "energy_kwh", "co2_ug", "utility", "nearest_dataset"]]),
                 use_container_width=True, hide_index=True,
             )
             with st.expander("Suggested hyperparameters & nearest historical evidence", expanded=False):
@@ -1401,7 +1402,7 @@ def recommender_lab_page():
                 meta = st.session_state.get("mlrec_meta") or {}
                 neighbors = (meta.get("neighbors") or {}).get(str(best["framework"]), [])
                 if neighbors:
-                    st.dataframe(pd.DataFrame(neighbors), use_container_width=True, hide_index=True)
+                    st.dataframe(display_frame(pd.DataFrame(neighbors)), use_container_width=True, hide_index=True)
 
     with tab_eval:
         st.markdown("### Historical meta-evidence quality")
@@ -1423,12 +1424,12 @@ def recommender_lab_page():
                         "Energy measured": float(pd.to_numeric(block["energy_consumption_kwh"], errors="coerce").notna().mean()),
                         "CO₂ measured": float(pd.to_numeric(block.get("co2_ug"), errors="coerce").notna().mean()),
                     })
-                st.dataframe(pd.DataFrame(metric_rows), use_container_width=True, hide_index=True)
+                st.dataframe(display_frame(pd.DataFrame(metric_rows)), use_container_width=True, hide_index=True)
         st.warning(
             "Research note: historical zeros that indicate unmeasured carbon are treated as missing before ML fitting. "
             "The recommender should be evaluated with leave-one-dataset-out validation before publication claims."
         )
-        st.markdown("**Recommended evaluation:** Top-1 framework selection · normalized regret · rank correlation · per-dataset coverage · calibration of predicted utility.")
+        st.markdown(framework_label("**Recommended evaluation:** Top-1 framework selection · normalized regret · rank correlation · per-dataset coverage · calibration of predicted utility."))
 
 
 def trust_page():
@@ -1502,7 +1503,7 @@ def information_seeking_page():
         st.subheader("Session summary")
         users = [x for x in st.session_state.chat_log if x["role"] == "user"]
         cats = [classify_follow_up(x["text"]) for x in users]
-        st.metric("Follow-up questions", len(users))
+        st.metric(framework_label("Follow-up questions"), framework_label(len(users)))
         st.write(pd.Series(cats).value_counts().rename_axis("behavior").to_frame("count") if cats else "No questions yet")
         accepted = st.checkbox("Participant accepted the first answer without further probing", value=False, key="info_accepted")
         if st.button("Save session endpoint", key="info_save"):
@@ -1512,9 +1513,9 @@ def information_seeking_page():
 
 def protocol_page():
     hero("Reproducibility", "Research Protocol", "Turn reviewer concerns and fairness-aware AutoML ideas into explicit streaming experiments rather than hidden implementation choices.")
-    tabs = st.tabs(["Streaming evaluation", "Human-centric LLM + AutoML", "Fairness-aware optimization", "Recommendation", "Sustainability", "Human studies", "LLM & privacy"])
+    tabs = st.tabs(display_labels(["Streaming evaluation", "Human-centric LLM + AutoML", "Fairness-aware optimization", "Recommendation", "Sustainability", "Human studies", "LLM & privacy"]))
     with tabs[0]:
-        st.markdown("**Primary rule:** prequential test-then-train, preserve temporal order, and use the same budget for all frameworks. Report sample cap, window size, seed, drift detector and missing-value treatment.")
+        st.markdown(framework_label("**Primary rule:** prequential test-then-train, preserve temporal order, and use the same budget for all frameworks. Report sample cap, window size, seed, drift detector and missing-value treatment."))
     with tabs[1]:
         st.markdown("""
 **Human-centric static AutoML → streaming AwareML**

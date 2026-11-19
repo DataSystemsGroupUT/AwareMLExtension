@@ -12,8 +12,8 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[2]
 SCENARIO_PATH = ROOT / "data" / "journal" / "objective_selection_benchmark_v2" / "frozen" / "primary_benchmark.csv"
 CONTEXT_DIR = ROOT / "artifacts"
-DESIGN_DIR = ROOT / "data" / "journal" / "information_seeking_v2" / "frozen"
-CONTEXT_SCHEMA = "information_seeking_context_v2_1"
+DESIGN_DIR = ROOT / "data" / "journal" / "information_seeking_v3" / "frozen"
+CONTEXT_SCHEMA = "information_seeking_context_v3"
 
 
 def protocol() -> dict:
@@ -31,7 +31,7 @@ def scenario_catalog() -> pd.DataFrame:
 
 
 def context_path(mode: str) -> Path:
-    return CONTEXT_DIR / ("information_seeking_context_v2_{}.json".format("final" if mode == "final" else "pilot"))
+    return CONTEXT_DIR / ("information_seeking_context_v3_{}.json".format("final" if mode == "final" else "pilot"))
 
 
 def _compact_result(row: dict) -> dict:
@@ -49,7 +49,15 @@ def _compact_result(row: dict) -> dict:
     }
 
 
-def save_context(mode: str, results: Sequence[dict], ranking: Sequence[dict], scenario: dict, alignment_attested: bool = False) -> dict:
+def save_context(mode: str, results: Sequence[dict], ranking: Sequence[dict], scenario: dict, alignment_attested: bool = False, weights: Optional[dict] = None) -> dict:
+    from .morten_review_v3 import study_ranking, digest
+    if not alignment_attested: raise ValueError("Confirm the restricted study task before saving context.")
+    if mode == 'final':
+        from .store import StudyStore
+        events=StudyStore().export('information_seeking_v3_final')
+        if not events.empty and events['event_type'].eq('session_start').any():
+            raise ValueError('Final context cannot be replaced after collection starts. Finish the current study or create a new protocol version.')
+    scored, scoring = study_ranking(list(results), scenario, weights)
     path = context_path(mode)
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -62,10 +70,13 @@ def save_context(mode: str, results: Sequence[dict], ranking: Sequence[dict], sc
             "This does not claim that the benchmark dataset is literally the textual scenario."
         ),
         "results": [_compact_result(x) for x in results],
-        "ranking": [dict(x) for x in ranking],
+        "ranking": scored,
+        "source_decision_lab_ranking": [dict(x) for x in ranking],
+        "scoring": scoring,
+        "ranking_recomputed_on_participant_input": False,
+        "scope_notice": "Included four-objective subset only. Privacy/security and other requirements are not validated.",
     }
-    raw = json.dumps(payload, sort_keys=True, default=str, ensure_ascii=False).encode()
-    payload["context_id"] = hashlib.sha256(raw).hexdigest()
+    payload["context_id"] = digest(payload)
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
     return payload
 
@@ -75,9 +86,12 @@ def load_context(mode: str) -> Optional[dict]:
     if not path.exists():
         return None
     data = json.loads(path.read_text(encoding="utf-8"))
-    if data.get("schema_version") in {"information_seeking_context_v2", CONTEXT_SCHEMA}:
-        return data
-    return None
+    from .morten_review_v3 import digest
+    if data.get('schema_version') != CONTEXT_SCHEMA: return None
+    saved_hash=data.pop('context_id',None)
+    if saved_hash != digest(data): raise ValueError('Saved context integrity check failed.')
+    data['context_id']=saved_hash
+    return data
 
 
 def mean_sd(values: Sequence[Any]) -> Tuple[Optional[float], Optional[float]]:
@@ -150,6 +164,8 @@ def session_summaries(events: pd.DataFrame) -> pd.DataFrame:
             rec["total_time_to_final_decision_sec"] = payload.get("total_time_to_final_decision_sec")
             rec["override_correction"] = payload.get("override_correction")
             rec["override_targets"] = payload.get("override_targets") or []
+            rec["scope_basis"] = payload.get("scope_basis")
+            rec["context_id"] = payload.get("context_id")
     return pd.DataFrame(list(sessions.values()))
 
 
@@ -258,6 +274,7 @@ def analyze(events: pd.DataFrame) -> Dict[str, Any]:
 
     out["follow_up_rate"] = float((pd.to_numeric(completed["follow_up_count"], errors="coerce").fillna(0) > 0).mean())
     out["information_seeking_rate"] = float(((pd.to_numeric(completed["follow_up_count"], errors="coerce").fillna(0) > 0) | (pd.to_numeric(completed["evidence_view_count"], errors="coerce").fillna(0) > 0)).mean())
+    out["scope_basis_counts"] = completed["scope_basis"].value_counts().to_dict() if "scope_basis" in completed else {}
     out["decision_counts"] = completed["recommendation_decision"].value_counts().to_dict()
     out["experience_counts"] = completed["experience_group"].value_counts().to_dict()
 

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from awareml.ui_v2.framework_labels import framework_label, framework_description, display_labels, display_frame, display_figure
 
 import json
 import uuid
@@ -142,7 +143,7 @@ def _render_contribution_chart(ranked: pd.DataFrame, weights: Mapping[str, Any],
         xaxis_title="Weighted utility contribution",
         yaxis_title=None,
     )
-    st.plotly_chart(fig, use_container_width=True, key=key)
+    st.plotly_chart(display_figure(fig), use_container_width=True, key=key)
     st.caption(
         "Each bar is decomposed into weight × normalized desirability. This makes the ranking auditable: utility is a relative preference score, not a confidence probability."
     )
@@ -181,9 +182,9 @@ def _render_uncertainty_chart(ranked: pd.DataFrame, key: str) -> None:
         fig.update_xaxes(tickangle=-18, row=r, col=c)
         fig.update_yaxes(title_text=("Higher is better" if maximize else "Lower is better"), row=r, col=c)
     fig.update_layout(height=660, margin=dict(l=45, r=25, t=65, b=70), title="Predicted objective evidence with empirical 90% bounds")
-    st.plotly_chart(fig, use_container_width=True, key=key)
+    st.plotly_chart(display_figure(fig), use_container_width=True, key=key)
     st.caption(
-        "The intervals are predictive evidence inherited from empirical residual calibration. They describe uncertainty around predicted outcomes; they are not the probability that a framework will win."
+        framework_label("The intervals are predictive evidence inherited from empirical residual calibration. They describe uncertainty around predicted outcomes; they are not the probability that a framework will win.")
     )
 
 
@@ -229,10 +230,10 @@ def _render_stability_chart(ranked: pd.DataFrame, key: str) -> None:
         aspect="auto",
     )
     fig.update_layout(height=350, margin=dict(l=90, r=25, t=55, b=65))
-    st.plotly_chart(fig, use_container_width=True, key=key)
+    st.plotly_chart(display_figure(fig), use_container_width=True, key=key)
     if not winners.empty:
         winner_text = " · ".join("{}: {}".format(r["Framework"], int(r["Profiles won"])) for _, r in winners.sort_values("Profiles won", ascending=False).iterrows())
-        st.caption("Predefined-profile wins: {}. This is a sensitivity diagnostic over the same predicted outcomes; no framework is rerun.".format(winner_text))
+        st.caption(framework_label("Predefined-profile wins: {}. This is a sensitivity diagnostic over the same predicted outcomes; no framework is rerun.".format(winner_text)))
 
 
 def render_decision_space_research_layer(ranked: pd.DataFrame, weights: Mapping[str, Any], meta: Optional[Mapping[str, Any]] = None) -> None:
@@ -242,7 +243,7 @@ def render_decision_space_research_layer(ranked: pd.DataFrame, weights: Mapping[
     st.caption(
         "The 3D scene is the trade-off view; the panels below make the exact utility calculation, uncertainty, and preference sensitivity inspectable."
     )
-    t1, t2, t3 = st.tabs(["Utility decomposition", "Prediction uncertainty", "Preference sensitivity"])
+    t1, t2, t3 = st.tabs(display_labels(["Utility decomposition", "Prediction uncertainty", "Preference sensitivity"]))
     with t1:
         _render_contribution_chart(ranked, weights, "rg_decision_contrib")
         sorted_ranked = ranked.sort_values("rank") if "rank" in ranked.columns else ranked.sort_values("utility", ascending=False)
@@ -250,9 +251,9 @@ def render_decision_space_research_layer(ranked: pd.DataFrame, weights: Mapping[
             top, runner = sorted_ranked.iloc[0], sorted_ranked.iloc[1]
             margin = float(top["utility"]) - float(runner["utility"])
             c1, c2, c3 = st.columns(3)
-            c1.metric("Predicted #1", str(top["framework"]))
-            c2.metric("Runner-up", str(runner["framework"]))
-            c3.metric("Utility margin", "{:.4f}".format(margin))
+            c1.metric(framework_label("Predicted #1"), framework_label(str(top["framework"])))
+            c2.metric(framework_label("Runner-up"), framework_label(str(runner["framework"])))
+            c3.metric(framework_label("Utility margin"), framework_label("{:.4f}".format(margin)))
             st.info(
                 "The recommendation is based on relative utility under {}. A small #1–#2 margin indicates that the decision is preference-sensitive even if the rank is currently unambiguous.".format(_weights_text(weights))
             )
@@ -288,17 +289,17 @@ def render_dataset_aware_research_layer(state: Dict[str, Any], ranked: pd.DataFr
     if ranked is None or ranked.empty:
         return
     st.markdown("### Recommendation diagnostics and human review")
-    tabs = st.tabs(["Why this ranking?", "Uncertainty", "Sensitivity", "Human decision"])
+    tabs = st.tabs(display_labels(["Why this ranking?", "Uncertainty", "Sensitivity", "Human decision"]))
     with tabs[0]:
         _render_contribution_chart(ranked, weights, "rg_dataset_contrib")
         order = ranked.sort_values("rank") if "rank" in ranked.columns else ranked.sort_values("utility", ascending=False)
         top = order.iloc[0]
         runner = order.iloc[1] if len(order) > 1 else None
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Predicted #1", str(top["framework"]))
-        c2.metric("Utility", "{:.4f}".format(float(top["utility"])))
-        c3.metric("Runner-up", str(runner["framework"]) if runner is not None else "N/A")
-        c4.metric("#1–#2 margin", "{:.4f}".format(float(top["utility"] - runner["utility"])) if runner is not None else "N/A")
+        c1.metric(framework_label("Predicted #1"), framework_label(str(top["framework"])))
+        c2.metric(framework_label("Utility"), framework_label("{:.4f}".format(float(top["utility"]))))
+        c3.metric(framework_label("Runner-up"), framework_label(str(runner["framework"]) if runner is not None else "N/A"))
+        c4.metric(framework_label("#1–#2 margin"), framework_label("{:.4f}".format(float(top["utility"] - runner["utility"])) if runner is not None else "N/A"))
     with tabs[1]:
         _render_uncertainty_chart(ranked, "rg_dataset_uncertainty")
     with tabs[2]:
@@ -306,7 +307,7 @@ def render_dataset_aware_research_layer(state: Dict[str, Any], ranked: pd.DataFr
     with tabs[3]:
         st.markdown("**Human review of the dataset-aware recommendation**")
         st.caption(
-            "The frozen recommender remains unchanged. This review records whether you would use the recommendation, keep it as an alternative, or reject it; it does not retrain the model or alter the held-out evidence."
+            "This review records whether you would use the recommendation, keep it as an alternative, or reject it. It does not retrain the model or alter the held-out evidence."
         )
         decision = st.segmented_control(
             "How do you want to treat this recommendation?",
@@ -360,7 +361,7 @@ def render_historical_prior_research_layer(ranking: pd.DataFrame, weights: Mappi
             )
             fig.update_traces(textposition="top center")
             fig.update_layout(height=390, showlegend=False, margin=dict(l=45, r=25, t=55, b=55))
-            st.plotly_chart(fig, use_container_width=True, key="rg_historical_scatter")
+            st.plotly_chart(display_figure(fig), use_container_width=True, key="rg_historical_scatter")
     with right:
         cols = [c for c in ["framework", "historical_utility", "utility_iqr", "win_rate", "top3_rate"] if c in ranking.columns]
         robust = ranking[cols].copy().rename(columns={
@@ -371,7 +372,7 @@ def render_historical_prior_research_layer(ranking: pd.DataFrame, weights: Mappi
             "top3_rate": "Top-3 rate",
         })
         st.markdown("**Robustness summary**")
-        st.dataframe(robust, use_container_width=True, hide_index=True)
+        st.dataframe(display_frame(robust), use_container_width=True, hide_index=True)
         st.info(
             "Why keep this prior? It provides an interpretable dataset-free baseline. Agreement with the dataset-aware model is corroborating evidence; disagreement is a useful signal that this dataset may differ from the global development pattern."
         )
@@ -381,7 +382,7 @@ def render_goal_recommendation_research_layer(ranked: pd.DataFrame, weights: Map
     if ranked is None or ranked.empty:
         return
     st.markdown("#### Decision trace · why the recommendation is #1")
-    t1, t2 = st.tabs(["Objective contributions", "Top alternatives"])
+    t1, t2 = st.tabs(display_labels(["Objective contributions", "Top alternatives"]))
     with t1:
         _render_contribution_chart(ranked, weights, "rg_goal_contrib")
     with t2:
@@ -392,13 +393,13 @@ def render_goal_recommendation_research_layer(ranked: pd.DataFrame, weights: Map
             "accuracy": "Accuracy", "runtime": "Runtime (s)", "energy": "Energy (kWh)",
             "co2": "CO₂ (kg)", "near_pareto": "ε-Pareto",
         })
-        st.dataframe(table, use_container_width=True, hide_index=True)
+        st.dataframe(display_frame(table), use_container_width=True, hide_index=True)
         if len(order) >= 2:
             top, runner = order.iloc[0], order.iloc[1]
             st.info(
-                "{} is currently #1 with utility {:.4f}; {} is #2 with {:.4f}. The margin is {:.4f}. The ranking can change if the human changes the objective weights because the predicted outcome profiles remain fixed while utility is recomputed.".format(
+                framework_label("{} is currently #1 with utility {:.4f}; {} is #2 with {:.4f}. The margin is {:.4f}. The ranking can change if the human changes the objective weights because the predicted outcome profiles remain fixed while utility is recomputed.".format(
                     top["framework"], float(top["utility"]), runner["framework"], float(runner["utility"]), float(top["utility"] - runner["utility"])
-                )
+                ))
             )
 
 
@@ -427,9 +428,9 @@ def render_priority_review_preview(selected: Sequence[str], corrected: Optional[
     )
     fig.update_yaxes(tickformat=".0%")
     fig.update_layout(height=300, legend=dict(orientation="h", y=-0.2), margin=dict(l=35, r=20, t=50, b=70))
-    st.plotly_chart(fig, use_container_width=True, key="rg_priority_preview")
+    st.plotly_chart(display_figure(fig), use_container_width=True, key="rg_priority_preview")
     st.caption(
-        "Saving the correction reranks the same dataset meta-profile. It does not retrain the frozen recommender and does not execute a framework."
+        framework_label("Saving the correction reranks the same dataset profile. It does not retrain the recommender or execute a framework.")
     )
 
 
@@ -461,11 +462,11 @@ AUTOSTREAMML_LEGACY_SEARCH_SPACE = {
 
 def render_framework_parameter_reference(framework: str) -> None:
     st.caption(
-        "Framework-parameter edits are configuration metadata unless the selected framework adapter explicitly exposes those parameters to the execution runner. They must not be assumed to apply across frameworks."
+        framework_label("Framework-parameter edits are configuration metadata unless the selected framework adapter explicitly exposes those parameters to the execution runner. They must not be assumed to apply across frameworks.")
     )
     if str(framework) != "AutoStreamML":
         st.info(
-            "The currently proposed framework is {}. The legacy AutoStreamML search space is therefore not applied to this plan. A framework-specific parameter registry is required before parameters can be safely staged for execution.".format(framework or "N/A")
+            framework_label("The currently proposed framework is {}. The legacy AutoStreamML search space is therefore not applied to this plan. A framework-specific parameter registry is required before parameters can be safely staged for execution.".format(framework or "N/A"))
         )
     if st.checkbox("Show legacy AutoStreamML search-space reference", key="rg_show_autostream_legacy"):
         rows = []
@@ -474,7 +475,7 @@ def render_framework_parameter_reference(framework: str) -> None:
                 rows.append({"Component": component, "Parameter": "—", "Search space": "No explicit parameters"})
             for parameter, values in params.items():
                 rows.append({"Component": component, "Parameter": parameter, "Search space": values})
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.dataframe(display_frame(pd.DataFrame(rows)), use_container_width=True, hide_index=True)
         st.caption(
             "Reference source: the previous AutoML_Stream/AutoStreamML.py search-space definition. This table is informational until the current AwareML adapter validates and wires each parameter."
         )
@@ -497,7 +498,7 @@ def render_final_review_research_layer(state: Dict[str, Any], saved: Mapping[str
     diff = _config_diff_frame(saved)
     if not diff.empty:
         st.markdown("**Recorded configuration changes**")
-        st.dataframe(diff, use_container_width=True, hide_index=True)
+        st.dataframe(display_frame(diff), use_container_width=True, hide_index=True)
     final_config = _as_dict(saved.get("final_config"))
     st.caption(
         "Approval is intentionally separate from execution. You can stage the supported settings for Run Studio, inspect the handoff there, and still decide when to start the benchmark."
@@ -580,9 +581,9 @@ def render_run_studio_handoff(state: Dict[str, Any]) -> None:
         "A human-approved Copilot plan has been staged for this workspace. Nothing runs automatically. Review which settings can be mapped to the current Run Studio before applying them."
     )
     c1, c2, c3 = st.columns(3)
-    c1.metric("Handoff", str(handoff.get("handoff_id") or "N/A"))
-    c2.metric("Approved framework", str(cfg.get("framework") or "N/A"))
-    c3.metric("Mapped Run Studio fields", len(supported))
+    c1.metric(framework_label("Handoff"), framework_label(str(handoff.get("handoff_id") or "N/A")))
+    c2.metric(framework_label("Approved framework"), framework_label(str(cfg.get("framework") or "N/A")))
+    c3.metric(framework_label("Mapped Run Studio fields"), framework_label(len(supported)))
 
     rows = []
     labels = {
@@ -594,7 +595,7 @@ def render_run_studio_handoff(state: Dict[str, Any]) -> None:
     }
     for key, value in supported.items():
         rows.append({"Run Studio setting": labels.get(key, key), "Staged value": value, "Status": "Can apply"})
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    st.dataframe(display_frame(pd.DataFrame(rows)), use_container_width=True, hide_index=True)
     if retained:
         with st.expander("Approved settings retained for audit/manual configuration", expanded=False):
             for item in retained:
@@ -614,3 +615,4 @@ def render_run_studio_handoff(state: Dict[str, Any]) -> None:
         if st.button("Clear staged Copilot handoff", key="rg_clear_handoff"):
             state.pop("copilot_run_studio_handoff", None)
             st.rerun()
+

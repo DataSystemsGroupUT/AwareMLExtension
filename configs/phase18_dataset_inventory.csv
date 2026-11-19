@@ -1,0 +1,33 @@
+dataset_id,filename,cohort,target,sensitive_attribute,positive_label_json,dataset_family,source_type,drift_type,notes
+abalone_Real,abalone_Real.csv,historical_23,__LAST__,,1,unknown,real,unknown,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+ailerons_Synthetic,ailerons_Synthetic.csv,historical_23,__LAST__,,1,unknown,synthetic,unknown,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+bike_Real,bike_Real.csv,historical_23,__LAST__,,1,unknown,real,unknown,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+cpu_activity_Real,cpu_activity_Real.csv,historical_23,__LAST__,,1,unknown,real,unknown,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+diamonds_Real,diamonds_Real.csv,historical_23,__LAST__,,1,unknown,real,unknown,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+elevators_Synthetic,elevators_Synthetic.csv,historical_23,__LAST__,,1,unknown,synthetic,unknown,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+fried_Synthetic,fried_Synthetic.csv,historical_23,__LAST__,,1,unknown,synthetic,unknown,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+FriedmanGra_Synthetic,FriedmanGra_ Synthetic.csv,historical_23,__LAST__,,1,unknown,synthetic,unknown,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+FriedmanLea_Synthetic,FriedmanLea_ Synthetic.csv,historical_23,__LAST__,,1,unknown,synthetic,unknown,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+health_insurance_Real,health_insurance_Real.csv,historical_23,__LAST__,,1,unknown,real,unknown,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+House8L_Real,House8L_Real.csv,historical_23,__LAST__,,1,unknown,real,unknown,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+hyperA_Synthetic,hyperA_ Synthetic.csv,historical_23,__LAST__,,1,unknown,synthetic,unknown,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+kin8nm_Real,kin8nm_Real.csv,historical_23,__LAST__,,1,unknown,real,unknown,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+MetroTraffic_Real,MetroTraffic_Real.csv,historical_23,__LAST__,,1,unknown,real,unknown,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+nomao_Real,nomao_Real.csv,historical_23,__LAST__,,1,unknown,real,unknown,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+physiochemical_protein_Real,physiochemical_protein_Real.csv,historical_23,__LAST__,,1,unknown,real,unknown,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+RBFm_100k_Synthetic,RBFm_100k__Synthetic.csv,historical_23,__LAST__,,1,unknown,synthetic,unknown,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+RTG_2abrupt_Synthetic,RTG_2abrupt_Synthetic.csv,historical_23,__LAST__,,1,unknown,synthetic,abrupt,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+sarcos_Real,sarcos_Real.csv,historical_23,__LAST__,,1,unknown,real,unknown,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+SEA_Abrubt_5_Synthetic,SEA_Abrubt_5_Synthetic.csv,historical_23,__LAST__,,1,unknown,synthetic,abrupt,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+SEA_Mixed_5_Synthetic,SEA_Mixed_5_Synthetic.csv,historical_23,__LAST__,,1,unknown,synthetic,mixed,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+SINE_Abrupt_Synthetic,SINE_Abrupt_Synthetic.csv,historical_23,__LAST__,,1,unknown,synthetic,abrupt,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+white_wine_Real,white_wine_Real.csv,historical_23,__LAST__,,1,unknown,real,unknown,Historical held-out cohort; target resolved from final CSV column and audited before freeze.
+adult_binary_stream,adult_binary_stream.csv,extension_9,income,sex,1,unknown,real,unknown,Additional journal-extension dataset; explicit binary target verified from supplied CSV.
+bank_stream,bank_stream.csv,extension_9,age_group,,"""age_ge_40""",unknown,real,unknown,Additional journal-extension dataset; age_group is the explicit binary target. Review scientific interpretation before freeze.
+census_income_stream,census_income_stream.csv,extension_9,income_binary,sex,1,unknown,real,unknown,Additional journal-extension dataset; explicit binary target verified from supplied CSV.
+credit_card_stream,credit_card_stream.csv,extension_9,age_group,sex_label,"""age_ge_40""",unknown,real,unknown,Additional journal-extension dataset; age_group is the explicit binary target and sex_label is audit-only sensitive attribute.
+dutch_census_stream_awareml,dutch_census_stream_awareml.csv,extension_9,occupation_binary,sex,1,unknown,real,unknown,Additional journal-extension dataset; explicit binary target verified from supplied CSV.
+german_credit_stream_80_20,german_credit_stream_80_20.csv,extension_9,risk,sex,"""good""",unknown,real,unknown,Additional journal-extension dataset; explicit binary target verified from supplied CSV.
+insurance_stream,insurance_stream.csv,extension_9,charges_high,sex,1,unknown,real,unknown,Additional journal-extension dataset; explicit binary target verified from supplied CSV.
+law_dataset_stream,law_dataset_stream.csv,extension_9,race_group,male,"""group_1""",unknown,real,unknown,Additional journal-extension dataset; race_group is target and male is audit-only sensitive attribute. Review scientific interpretation before freeze.
+StudentsPerformance_stream,StudentsPerformance_stream.csv,extension_9,performance_high,gender,1,unknown,real,unknown,Additional journal-extension dataset; explicit binary target verified from supplied CSV.

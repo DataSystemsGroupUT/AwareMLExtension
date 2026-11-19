@@ -1,0 +1,136 @@
+{
+  "production_evidence": false,
+  "status": "pass",
+  "tested": [
+    {
+      "error": null,
+      "samples": 160,
+      "status": "completed",
+      "task": {
+        "cohort": "dev",
+        "dataset_id": "smoke_2classes",
+        "expected_samples": 160,
+        "framework": "AutoStreamML",
+        "seed": 42,
+        "task_id": 0
+      }
+    },
+    {
+      "error": null,
+      "samples": 160,
+      "status": "completed",
+      "task": {
+        "cohort": "dev",
+        "dataset_id": "smoke_2classes",
+        "expected_samples": 160,
+        "framework": "AutoClass",
+        "seed": 42,
+        "task_id": 1
+      }
+    },
+    {
+      "error": null,
+      "samples": 160,
+      "status": "completed",
+      "task": {
+        "cohort": "dev",
+        "dataset_id": "smoke_2classes",
+        "expected_samples": 160,
+        "framework": "EvoAutoML",
+        "seed": 42,
+        "task_id": 2
+      }
+    },
+    {
+      "error": null,
+      "samples": 160,
+      "status": "completed",
+      "task": {
+        "cohort": "dev",
+        "dataset_id": "smoke_2classes",
+        "expected_samples": 160,
+        "framework": "OAML",
+        "seed": 42,
+        "task_id": 3
+      }
+    },
+    {
+      "error": null,
+      "samples": 160,
+      "status": "completed",
+      "task": {
+        "cohort": "dev",
+        "dataset_id": "smoke_2classes",
+        "expected_samples": 160,
+        "framework": "ChaCha",
+        "seed": 42,
+        "task_id": 4
+      }
+    },
+    {
+      "error": null,
+      "samples": 160,
+      "status": "completed",
+      "task": {
+        "cohort": "dev",
+        "dataset_id": "smoke_3classes",
+        "expected_samples": 160,
+        "framework": "AutoStreamML",
+        "seed": 42,
+        "task_id": 5
+      }
+    },
+    {
+      "error": null,
+      "samples": 160,
+      "status": "completed",
+      "task": {
+        "cohort": "dev",
+        "dataset_id": "smoke_3classes",
+        "expected_samples": 160,
+        "framework": "AutoClass",
+        "seed": 42,
+        "task_id": 6
+      }
+    },
+    {
+      "error": null,
+      "samples": 160,
+      "status": "completed",
+      "task": {
+        "cohort": "dev",
+        "dataset_id": "smoke_3classes",
+        "expected_samples": 160,
+        "framework": "EvoAutoML",
+        "seed": 42,
+        "task_id": 7
+      }
+    },
+    {
+      "error": null,
+      "samples": 160,
+      "status": "completed",
+      "task": {
+        "cohort": "dev",
+        "dataset_id": "smoke_3classes",
+        "expected_samples": 160,
+        "framework": "OAML",
+        "seed": 42,
+        "task_id": 8
+      }
+    },
+    {
+      "error": null,
+      "samples": 160,
+      "status": "completed",
+      "task": {
+        "cohort": "dev",
+        "dataset_id": "smoke_3classes",
+        "expected_samples": 160,
+        "framework": "ChaCha",
+        "seed": 42,
+        "task_id": 9
+      }
+    }
+  ]
+}
