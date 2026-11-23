@@ -1,4 +1,5 @@
 from __future__ import annotations
+from awareml.ui_v2.framework_labels import framework_label, framework_description, display_labels, display_frame, display_figure
 
 import pandas as pd
 import streamlit as st
@@ -43,7 +44,7 @@ def decision_space_page():
     )
 
     st.markdown(
-        """
+        framework_label("""
         <div class="r9-callout">
           <b>PRE-RUN PREFERENCE RECOMMENDATION</b><br>
           <b>Evidence source:</b> predicted framework outcomes from frozen ML Recommender V2.<br>
@@ -51,7 +52,7 @@ def decision_space_page():
           <b>Ranking engine:</b> ML Recommender V2 preference-aware reranking.<br>
           <b>Framework execution:</b> not required; these are predictions, not observed results.
         </div>
-        """,
+        """),
         unsafe_allow_html=True,
     )
 
@@ -96,13 +97,13 @@ def decision_space_page():
     state["ranking_mode"] = "conservative" if mode == "Conservative 90% bounds" else "point"
 
     st.markdown(
-        """
+        framework_label("""
         <div class="r9-callout">
           <b>Point prediction</b> ranks frameworks using the central predicted Accuracy, Runtime, Energy and CO₂.
           <b>Conservative 90% bounds</b> uses the <b>lower accuracy bound</b> and the <b>upper Runtime/Energy/CO₂ bounds</b>,
           giving a risk-aware ranking that asks: “which framework still looks good under an unfavorable but calibrated scenario?”
         </div>
-        """,
+        """),
         unsafe_allow_html=True,
     )
 
@@ -120,22 +121,22 @@ def decision_space_page():
     render_decision_space_context(ranked, state, selected)
     cols = st.columns(6)
     with cols[0]:
-        st.metric("Pre-run recommended framework", str(top["framework"]), "Predicted rank #1")
+        st.metric(framework_label("Pre-run recommended framework"), framework_label(str(top["framework"])), "Predicted rank #1")
     with cols[1]:
-        st.metric("Pre-run preference utility", fmt(top["utility"], 4))
+        st.metric(framework_label("Pre-run preference utility"), framework_label(fmt(top["utility"], 4)))
     with cols[2]:
-        st.metric("{} predicted accuracy".format(selected), fmt(selected_row["accuracy"], 4))
+        st.metric(framework_label("{} predicted accuracy".format(selected)), framework_label(fmt(selected_row["accuracy"], 4)))
     with cols[3]:
-        st.metric("{} predicted runtime".format(selected), fmt(selected_row["runtime"], 3, " s"))
+        st.metric(framework_label("{} predicted runtime".format(selected)), framework_label(fmt(selected_row["runtime"], 3, " s")))
     with cols[4]:
-        st.metric("{} predicted energy".format(selected), fmt(selected_row["energy"], 6, " kWh"))
+        st.metric(framework_label("{} predicted energy".format(selected)), framework_label(fmt(selected_row["energy"], 6, " kWh")))
     with cols[5]:
-        st.metric("{} predicted CO₂".format(selected), fmt(selected_row.get("co2"), 6, " kg"))
+        st.metric(framework_label("{} predicted CO₂".format(selected)), framework_label(fmt(selected_row.get("co2"), 6, " kg")))
 
     st.caption(
-        "Recommended framework and inspected framework are different concepts: "
+        framework_label("Recommended framework and inspected framework are different concepts: "
         "the first two cards describe the current predicted rank #1, while the "
-        "four objective cards describe the framework chosen in 'Inspect framework'."
+        "four objective cards describe the framework chosen in 'Inspect framework'.")
     )
 
     view_mode = st.segmented_control(
@@ -156,19 +157,19 @@ def decision_space_page():
             fig3d = decision_space_3d(ranked, selected)
         plot(fig3d, "r9_decision_3d", height=660)
         st.caption(
-            "Rotate and zoom directly in the Plotly scene. White outline = inspected framework; "
+            framework_label("Rotate and zoom directly in the Plotly scene. White outline = inspected framework; "
             "green outline = ε-Pareto candidate (ε=0.05). Normalized desirability is only a visualization transform; "
-            "ranking still uses the selected point/conservative evidence mode and the exact preference weights."
+            "ranking still uses the selected point/conservative evidence mode and the exact preference weights.")
         )
     with right:
         plot(ranking_bar(ranked), "r9_rank_bar")
         st.markdown(
-            """
+            framework_label("""
             <div class="r9-callout" style="margin-bottom:12px">
               <b>Why the ranking changes immediately:</b> the page does not rerun any framework.
               It keeps the same five predicted outcome profiles and only recomputes the weighted utility.
             </div>
-            """,
+            """),
             unsafe_allow_html=True,
         )
         for warning in meta.get("warnings") or []:
@@ -193,7 +194,7 @@ def decision_space_page():
         "co2", "co2_lower", "co2_upper",
     ]
     st.dataframe(
-        ranked[[c for c in display_cols if c in ranked.columns]],
+        display_frame(ranked[[c for c in display_cols if c in ranked.columns]]),
         use_container_width=True,
         hide_index=True,
     )
@@ -230,22 +231,22 @@ def run_studio_v2_page():
             top = ranked.iloc[0]
             cols = st.columns(4)
             with cols[0]:
-                st.metric("Pre-run recommendation", str(top["framework"]))
+                st.metric(framework_label("Pre-run recommendation"), framework_label(str(top["framework"])))
             with cols[1]:
-                st.metric("Predicted accuracy", fmt(top["accuracy"], 4))
+                st.metric(framework_label("Predicted accuracy"), framework_label(fmt(top["accuracy"], 4)))
             with cols[2]:
-                st.metric("Predicted runtime", fmt(top["runtime"], 3, " s"))
+                st.metric(framework_label("Predicted runtime"), framework_label(fmt(top["runtime"], 3, " s")))
             with cols[3]:
-                st.metric("Pre-run preference utility", fmt(top["utility"], 4))
+                st.metric(framework_label("Pre-run preference utility"), framework_label(fmt(top["utility"], 4)))
 
     st.markdown(
-        """
+        framework_label("""
         <div class="r9-callout">
           The experiment runner below is the validated AwareML temporal
           execution surface. Phase 9 wraps it in shared Research OS state
           rather than reimplementing the five framework adapters.
         </div>
-        """,
+        """),
         unsafe_allow_html=True,
     )
 

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from awareml.ui_v2.framework_labels import framework_label, framework_description, display_labels, display_frame, display_figure
 
 import numpy as np
 import pandas as pd
@@ -11,7 +12,7 @@ def plot(fig, key, height=None):
     if height is not None:
         fig.update_layout(height=height)
     st.plotly_chart(
-        fig,
+        display_figure(fig),
         use_container_width=True,
         key=key,
         config={
@@ -37,7 +38,7 @@ def fmt(value, digits=3, suffix=""):
 def phase_pills():
     status = phase_status()
     return [
-        ("ML Recommender", "good" if status["phase6"]["ready"] else "warn"),
+        ("ML Recommender", "good" if status["dataset_recommender"]["ready"] else "warn"),
         ("LLM Copilot", "good" if status["phase7"]["ready"] else "warn"),
         ("Faithfulness", "good" if status["phase8"]["ready"] else "warn"),
     ]

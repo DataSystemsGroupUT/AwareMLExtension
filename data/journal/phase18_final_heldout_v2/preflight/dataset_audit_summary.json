@@ -1,0 +1,339 @@
+{
+  "schema_version": "2.4",
+  "rows": 32,
+  "status_counts": {
+    "PASS": 15,
+    "BLOCKED_TARGET": 11,
+    "REVIEW": 5,
+    "EXCLUDE": 1
+  },
+  "role_counts": {
+    "primary_heldout_candidate": 15,
+    "task_definition_required": 11,
+    "classification_semantics_review": 5,
+    "development_overlap_control": 1
+  },
+  "primary_heldout_eligible": 15,
+  "primary_heldout_not_eligible": 17,
+  "development_overlap_count": 1,
+  "development_overlaps": [
+    {
+      "dataset_id": "adult_binary_stream",
+      "filename": "adult_binary_stream.csv",
+      "training_overlap_matched_dataset_ids": "adult"
+    }
+  ],
+  "cohorts": {
+    "historical_23": 23,
+    "extension_9": 9
+  },
+  "unresolved_dataset_ids": [
+    "abalone_Real",
+    "ailerons_Synthetic",
+    "bike_Real",
+    "cpu_activity_Real",
+    "diamonds_Real",
+    "elevators_Synthetic",
+    "fried_Synthetic",
+    "FriedmanGra_Synthetic",
+    "FriedmanLea_Synthetic",
+    "health_insurance_Real",
+    "House8L_Real",
+    "hyperA_Synthetic",
+    "kin8nm_Real",
+    "MetroTraffic_Real",
+    "physiochemical_protein_Real",
+    "sarcos_Real",
+    "adult_binary_stream"
+  ],
+  "targets": [
+    {
+      "dataset_id": "abalone_Real",
+      "resolved_target": "target",
+      "target_unique": 28,
+      "task_assessment": "classification_multiclass_review",
+      "preflight_status": "REVIEW",
+      "evaluation_role": "classification_semantics_review",
+      "primary_heldout_eligible": false
+    },
+    {
+      "dataset_id": "ailerons_Synthetic",
+      "resolved_target": "target",
+      "target_unique": 35,
+      "task_assessment": "classification_multiclass_review",
+      "preflight_status": "REVIEW",
+      "evaluation_role": "classification_semantics_review",
+      "primary_heldout_eligible": false
+    },
+    {
+      "dataset_id": "bike_Real",
+      "resolved_target": "cnt",
+      "target_unique": 869,
+      "task_assessment": "likely_continuous_or_regression",
+      "preflight_status": "BLOCKED_TARGET",
+      "evaluation_role": "task_definition_required",
+      "primary_heldout_eligible": false
+    },
+    {
+      "dataset_id": "cpu_activity_Real",
+      "resolved_target": "usr",
+      "target_unique": 56,
+      "task_assessment": "classification_multiclass_review",
+      "preflight_status": "REVIEW",
+      "evaluation_role": "classification_semantics_review",
+      "primary_heldout_eligible": false
+    },
+    {
+      "dataset_id": "diamonds_Real",
+      "resolved_target": "price",
+      "target_unique": 11602,
+      "task_assessment": "likely_continuous_or_regression",
+      "preflight_status": "BLOCKED_TARGET",
+      "evaluation_role": "task_definition_required",
+      "primary_heldout_eligible": false
+    },
+    {
+      "dataset_id": "elevators_Synthetic",
+      "resolved_target": "target",
+      "target_unique": 61,
+      "task_assessment": "classification_multiclass_review",
+      "preflight_status": "REVIEW",
+      "evaluation_role": "classification_semantics_review",
+      "primary_heldout_eligible": false
+    },
+    {
+      "dataset_id": "fried_Synthetic",
+      "resolved_target": "target",
+      "target_unique": 17396,
+      "task_assessment": "likely_continuous_or_regression",
+      "preflight_status": "BLOCKED_TARGET",
+      "evaluation_role": "task_definition_required",
+      "primary_heldout_eligible": false
+    },
+    {
+      "dataset_id": "FriedmanGra_Synthetic",
+      "resolved_target": "target",
+      "target_unique": 99723,
+      "task_assessment": "likely_continuous_or_regression",
+      "preflight_status": "BLOCKED_TARGET",
+      "evaluation_role": "task_definition_required",
+      "primary_heldout_eligible": false
+    },
+    {
+      "dataset_id": "FriedmanLea_Synthetic",
+      "resolved_target": "target",
+      "target_unique": 99741,
+      "task_assessment": "likely_continuous_or_regression",
+      "preflight_status": "BLOCKED_TARGET",
+      "evaluation_role": "task_definition_required",
+      "primary_heldout_eligible": false
+    },
+    {
+      "dataset_id": "health_insurance_Real",
+      "resolved_target": "whrswk",
+      "target_unique": 75,
+      "task_assessment": "classification_multiclass_review",
+      "preflight_status": "REVIEW",
+      "evaluation_role": "classification_semantics_review",
+      "primary_heldout_eligible": false
+    },
+    {
+      "dataset_id": "House8L_Real",
+      "resolved_target": "target",
+      "target_unique": 2045,
+      "task_assessment": "likely_continuous_or_regression",
+      "preflight_status": "BLOCKED_TARGET",
+      "evaluation_role": "task_definition_required",
+      "primary_heldout_eligible": false
+    },
+    {
+      "dataset_id": "hyperA_Synthetic",
+      "resolved_target": "target",
+      "target_unique": 495328,
+      "task_assessment": "likely_continuous_or_regression",
+      "preflight_status": "BLOCKED_TARGET",
+      "evaluation_role": "task_definition_required",
+      "primary_heldout_eligible": false
+    },
+    {
+      "dataset_id": "kin8nm_Real",
+      "resolved_target": "y",
+      "target_unique": 8163,
+      "task_assessment": "likely_continuous_or_regression",
+      "preflight_status": "BLOCKED_TARGET",
+      "evaluation_role": "task_definition_required",
+      "primary_heldout_eligible": false
+    },
+    {
+      "dataset_id": "MetroTraffic_Real",
+      "resolved_target": "target",
+      "target_unique": 6704,
+      "task_assessment": "likely_continuous_or_regression",
+      "preflight_status": "BLOCKED_TARGET",
+      "evaluation_role": "task_definition_required",
+      "primary_heldout_eligible": false
+    },
+    {
+      "dataset_id": "nomao_Real",
+      "resolved_target": "Class",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_candidate",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "physiochemical_protein_Real",
+      "resolved_target": "RMSD",
+      "target_unique": 15903,
+      "task_assessment": "likely_continuous_or_regression",
+      "preflight_status": "BLOCKED_TARGET",
+      "evaluation_role": "task_definition_required",
+      "primary_heldout_eligible": false
+    },
+    {
+      "dataset_id": "RBFm_100k_Synthetic",
+      "resolved_target": "class",
+      "target_unique": 5,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_candidate",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "RTG_2abrupt_Synthetic",
+      "resolved_target": "class",
+      "target_unique": 5,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_candidate",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "sarcos_Real",
+      "resolved_target": "V22",
+      "target_unique": 11414,
+      "task_assessment": "likely_continuous_or_regression",
+      "preflight_status": "BLOCKED_TARGET",
+      "evaluation_role": "task_definition_required",
+      "primary_heldout_eligible": false
+    },
+    {
+      "dataset_id": "SEA_Abrubt_5_Synthetic",
+      "resolved_target": "class",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_candidate",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "SEA_Mixed_5_Synthetic",
+      "resolved_target": "class",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_candidate",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "SINE_Abrupt_Synthetic",
+      "resolved_target": "class",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_candidate",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "white_wine_Real",
+      "resolved_target": "quality",
+      "target_unique": 7,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_candidate",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "adult_binary_stream",
+      "resolved_target": "income",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "EXCLUDE",
+      "evaluation_role": "development_overlap_control",
+      "primary_heldout_eligible": false
+    },
+    {
+      "dataset_id": "bank_stream",
+      "resolved_target": "age_group",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_candidate",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "census_income_stream",
+      "resolved_target": "income_binary",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_candidate",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "credit_card_stream",
+      "resolved_target": "age_group",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_candidate",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "dutch_census_stream_awareml",
+      "resolved_target": "occupation_binary",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_candidate",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "german_credit_stream_80_20",
+      "resolved_target": "risk",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_candidate",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "insurance_stream",
+      "resolved_target": "charges_high",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_candidate",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "law_dataset_stream",
+      "resolved_target": "race_group",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_candidate",
+      "primary_heldout_eligible": true
+    },
+    {
+      "dataset_id": "StudentsPerformance_stream",
+      "resolved_target": "performance_high",
+      "target_unique": 2,
+      "task_assessment": "classification",
+      "preflight_status": "PASS",
+      "evaluation_role": "primary_heldout_candidate",
+      "primary_heldout_eligible": true
+    }
+  ]
+}
