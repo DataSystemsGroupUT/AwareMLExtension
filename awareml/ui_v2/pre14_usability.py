@@ -1,4 +1,5 @@
 from __future__ import annotations
+from awareml.ui_v2.framework_labels import framework_label, framework_description, display_labels, display_frame, display_figure
 
 import copy
 import json
@@ -153,7 +154,7 @@ def quick_framework_selector(frameworks: Sequence[str], state: Dict[str, Any]) -
         default=current,
         key="pre14_quick_inspect_framework",
         help="One click changes the framework whose predicted metrics are shown; it does not rerun AutoML.",
-    ) or current
+     format_func=framework_label) or current
     state["selected_framework"] = selected
     return str(selected)
 
@@ -166,10 +167,10 @@ def render_decision_space_context(ranked: pd.DataFrame, state: Dict[str, Any], s
     c1, c2 = st.columns(2)
     with c1:
         st.markdown("**RECOMMENDED · pre-run prediction**")
-        st.metric(str(top["framework"]), "Predicted rank #{}".format(int(top.get("rank", 1))))
+        st.metric(framework_label(str(top["framework"])), framework_label("Predicted rank #{}".format(int(top.get("rank", 1)))))
     with c2:
         st.markdown("**CURRENTLY INSPECTING**")
-        st.metric(str(selected), "Predicted rank #{}".format(int(selected_row.get("rank", 0))))
+        st.metric(framework_label(str(selected)), framework_label("Predicted rank #{}".format(int(selected_row.get("rank", 0)))))
     st.caption(
         "Normalized preference utility is a relative score among the five candidates under the current weights; "
         "it is not a probability or model-confidence score."
@@ -386,9 +387,9 @@ def _render_simple_objective_review(
             st.rerun()
         elif choice == "Correct objectives":
             st.success(
-                "Objective review saved as {}. The corrected objective set is stored; framework reranking becomes available once a dataset profile exists.".format(
+                framework_label("Objective review saved as {}. The corrected objective set is stored; framework reranking becomes available once a dataset profile exists.".format(
                     record["review_id"]
-                )
+                ))
             )
             st.rerun()
         else:
@@ -437,7 +438,7 @@ def render_accessible_objective_interpretation(
     labels = [("Accuracy", "accuracy"), ("Runtime", "runtime"), ("Energy", "energy"), ("CO₂", "co2")]
     for col, (label, key) in zip(cols, labels):
         with col:
-            st.metric(label, "{:.3f}".format(float(weights.get(key, 0.0))))
+            st.metric(framework_label(label), framework_label("{:.3f}".format(float(weights.get(key, 0.0)))))
     st.caption(
         "Selected objectives share the total preference weight equally. These weights do not come from the dataset and are not confidence scores."
     )
@@ -452,7 +453,7 @@ def render_accessible_objective_interpretation(
             {"Decision": "Final action", "Source": "You", "Role": "Accept, correct, edit or reject the proposal."},
         ]
     )
-    st.dataframe(provenance, use_container_width=True, hide_index=True)
+    st.dataframe(display_frame(provenance), use_container_width=True, hide_index=True)
 
     # In context-free mode there is no AutoML plan yet, so objective review is step 3.
     # With a dataset, review is shown after the plan to keep the beginner flow 1→2→3→4→5.
@@ -616,18 +617,18 @@ def render_copilot_plan_summary(proposal: Mapping[str, Any], state: Dict[str, An
 
     st.markdown("## 3 · Copilot AutoML Plan")
     st.info(
-        "This is a **pre-run, reviewable proposal**. LLaMA/V3.1 interprets your objectives; ML Recommender V2 predicts the framework from the dataset meta-profile; "
-        "the configuration synthesizer supplies supported algorithm/configuration defaults; you make the final decision."
+        framework_label("This is a **pre-run, reviewable proposal**. LLaMA/V3.1 interprets your objectives; ML Recommender V2 predicts the framework from the dataset meta-profile; "
+        "the configuration synthesizer supplies supported algorithm/configuration defaults; you make the final decision.")
     )
     cards = st.columns(4)
     with cards[0]:
-        st.metric("Predicted framework", framework)
+        st.metric(framework_label("Predicted framework"), framework_label(framework))
     with cards[1]:
-        st.metric("Predicted rank", "#{} of 5".format(rank))
+        st.metric(framework_label("Predicted rank"), framework_label("#{} of 5".format(rank)))
     with cards[2]:
         st.metric(
-            "Normalized preference utility",
-            "—" if utility is None else "{:.4f}".format(float(utility)),
+            framework_label("Normalized preference utility"),
+            framework_label("—" if utility is None else "{:.4f}".format(float(utility))),
         )
     with cards[3]:
         saved_review = _as_dict(state.get("copilot_review"))
@@ -636,41 +637,41 @@ def render_copilot_plan_summary(proposal: Mapping[str, Any], state: Dict[str, An
             "approved_with_edits": "APPROVED WITH EDITS",
             "rejected": "REJECTED",
         }
-        st.metric("Proposal status", status_map.get(saved_review.get("decision"), "REVIEW REQUIRED"))
+        st.metric(framework_label("Proposal status"), framework_label(status_map.get(saved_review.get("decision"), "REVIEW REQUIRED")))
     st.caption(
         "Normalized preference utility is a relative ranking score under the current preferences. It is not a probability, correctness score or model confidence."
     )
 
-    st.markdown("### Why this framework fits your priorities")
+    st.markdown(framework_label("### Why this framework fits your priorities"))
     priority_text = _priority_summary(selected, weights)
     if utility is None:
         st.info(
-            "ML Recommender V2 compared the five candidate frameworks using the current dataset meta-profile and your priorities ({}). {} is currently predicted rank #1.".format(
+            framework_label("ML Recommender V2 compared the five candidate frameworks using the current dataset meta-profile and your priorities ({}). {} is currently predicted rank #1.".format(
                 priority_text, framework
-            )
+            ))
         )
     else:
         st.info(
-            "ML Recommender V2 compared the five candidate frameworks using the current dataset meta-profile and your priorities ({}). "
+            framework_label("ML Recommender V2 compared the five candidate frameworks using the current dataset meta-profile and your priorities ({}). "
             "{} has the highest normalized preference utility ({:.4f}) and is therefore predicted rank #1.".format(
                 priority_text, framework, float(utility)
-            )
+            ))
         )
     st.caption(
-        "The LLM did not choose {}. It only helped interpret your goal; the framework ranking comes from ML Recommender V2.".format(framework)
+        framework_label("The LLM did not choose {}. It only helped interpret your goal; the framework ranking comes from ML Recommender V2.".format(framework))
     )
 
     evidence = _priority_prediction_table(framework, selected, weights, ranked)
     if not evidence.empty:
         st.markdown("**Predicted evidence for the priorities you selected**")
-        st.dataframe(evidence, use_container_width=True, hide_index=True)
+        st.dataframe(display_frame(evidence), use_container_width=True, hide_index=True)
 
     if not ranked.empty and {"framework", "utility"}.issubset(ranked.columns):
         top3 = ranked.sort_values("rank" if "rank" in ranked.columns else "utility", ascending=True if "rank" in ranked.columns else False).head(3).copy()
         cols = [c for c in ["rank", "framework", "utility"] if c in top3.columns]
         top3 = top3[cols].rename(columns={"rank": "Predicted rank", "framework": "Framework", "utility": "Normalized utility"})
         st.markdown("**Top predicted alternatives**")
-        st.dataframe(top3, use_container_width=True, hide_index=True)
+        st.dataframe(display_frame(top3), use_container_width=True, hide_index=True)
 
     drift = _as_dict(config.get("drift"))
     fairness = _as_dict(config.get("fairness"))
@@ -689,7 +690,7 @@ def render_copilot_plan_summary(proposal: Mapping[str, Any], state: Dict[str, An
         {"Setting": "Energy / CO₂ tracking", "Proposed value": "Enabled" if sustain.get("track_energy") or sustain.get("track_co2") else "Not requested"},
     ]
     st.markdown("### What will run if you approve")
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    st.dataframe(display_frame(pd.DataFrame(rows)), use_container_width=True, hide_index=True)
     if not bool(fairness.get("requested")):
         st.caption(
             "Fairness constraint is 'Not requested by this goal' because the scenario did not ask AwareML to optimize or constrain fairness. "
@@ -698,9 +699,9 @@ def render_copilot_plan_summary(proposal: Mapping[str, Any], state: Dict[str, An
 
     if state.get("copilot_human_corrected_objectives"):
         st.success(
-            "Human objective correction is active: **{}**. The current framework ranking reflects the corrected weights.".format(
+            framework_label("Human objective correction is active: **{}**. The current framework ranking reflects the corrected weights.".format(
                 " + ".join(state.get("copilot_human_corrected_objectives") or [])
-            )
+            ))
         )
     if has_observed_run:
         st.caption(
@@ -804,7 +805,7 @@ def render_dataset_task_guard(state: Dict[str, Any]) -> None:
     support = fairness_support_table(df, target, state.get("sensitive"), state.get("positive_label"))
     if not support.empty:
         st.markdown("**Fairness support for the selected positive label**")
-        st.dataframe(support, use_container_width=True, hide_index=True)
+        st.dataframe(display_frame(support), use_container_width=True, hide_index=True)
         if analysis.get("likely_multiclass"):
             st.info(
                 "For this multiclass target, positive-label fairness is a **one-vs-rest** audit for `{}`. "
@@ -842,7 +843,7 @@ def render_fairness_validity_panel(state: Dict[str, Any], results: Sequence[Mapp
                 )
             )
         if not support.empty:
-            st.dataframe(support, use_container_width=True, hide_index=True)
+            st.dataframe(display_frame(support), use_container_width=True, hide_index=True)
             weak = bool((support["Support status"] == "weak").any())
             if weak:
                 st.warning("One or more group/positive-label cells have weak support; interpret disparity estimates cautiously.")
@@ -898,14 +899,14 @@ def render_pre_post_calibration(state: Dict[str, Any], observed_frame: pd.DataFr
         obs_fw = str(obs.iloc[0]["framework"])
         c1, c2, c3 = st.columns(3)
         with c1:
-            st.metric("Pre-run predicted #1", pred_fw)
+            st.metric(framework_label("Pre-run predicted #1"), framework_label(pred_fw))
         with c2:
-            st.metric("Post-run observed #1", obs_fw)
+            st.metric(framework_label("Post-run observed #1"), framework_label(obs_fw))
         with c3:
-            st.metric("Recommendation agreement", "Same" if pred_fw == obs_fw else "Changed")
+            st.metric(framework_label("Recommendation agreement"), framework_label("Same" if pred_fw == obs_fw else "Changed"))
         st.caption(
-            "A changed winner is not automatically an error: the pre-run ranking is based on dataset meta-features and four predicted objectives, "
-            "whereas Decision Lab can use observed outcomes plus fairness and interpretability. The table below shows prediction error where metrics are comparable."
+            framework_label("A changed winner is not automatically an error: the pre-run ranking is based on dataset meta-features and four predicted objectives, "
+            "whereas Decision Lab can use observed outcomes plus fairness and interpretability. The table below shows prediction error where metrics are comparable.")
         )
         rename_obs = {
             "runtime_sec": "runtime",
@@ -927,7 +928,7 @@ def render_pre_post_calibration(state: Dict[str, Any], observed_frame: pd.DataFr
                 row["Abs error {}".format(metric)] = abs(float(pv) - float(ov))
             rows.append(row)
         if rows:
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            st.dataframe(display_frame(pd.DataFrame(rows)), use_container_width=True, hide_index=True)
 
 
 def render_decision_lab_explanation(
@@ -947,14 +948,14 @@ def render_decision_lab_explanation(
     if accuracy_fw:
         accuracy_value = float(pd.to_numeric(frame.loc[frame["framework"].astype(str).eq(accuracy_fw), "accuracy"], errors="coerce").iloc[0])
 
-    st.markdown("### Why this framework wins overall")
+    st.markdown(framework_label("### Why this framework wins overall"))
     c1, c2 = st.columns(2)
     with c1:
-        st.metric("Highest overall utility", "{} · {:.3f}".format(top_fw, float(top_row.get("utility", 0.0))))
+        st.metric(framework_label("Highest overall utility"), framework_label("{} · {:.3f}".format(top_fw, float(top_row.get("utility", 0.0)))))
     with c2:
         st.metric(
-            "Highest observed accuracy",
-            "{} · {:.3f}".format(accuracy_fw, accuracy_value) if accuracy_fw and accuracy_value is not None else "N/A",
+            framework_label("Highest observed accuracy"),
+            framework_label("{} · {:.3f}".format(accuracy_fw, accuracy_value) if accuracy_fw and accuracy_value is not None else "N/A"),
         )
 
     leaders = []
@@ -988,10 +989,10 @@ def render_decision_lab_explanation(
         common, total = _common_fairness_coverage(result_dicts(state))
         coverage = len(common)
         st.info(
-            "**Common-criteria fairness coverage: {}/{}.** Composite fairness uses the same available criteria for every framework: {}. "
+            framework_label("**Common-criteria fairness coverage: {}/{}.** Composite fairness uses the same available criteria for every framework: {}. "
             "Missing criteria remain unavailable and are not converted to zero.".format(
                 coverage, total, ", ".join(common) if common else "none"
-            )
+            ))
         )
 
     near = bool(getattr(top, "near_pareto", top_row.get("near_pareto", False)))
@@ -1001,7 +1002,7 @@ def render_decision_lab_explanation(
             "This does not mean it is best on every metric.".format(top_fw)
         )
     else:
-        st.caption("Near-Pareto: No under the current ε tolerance; the framework can still rank highly under the chosen weighted utility.")
+        st.caption(framework_label("Near-Pareto: No under the current ε tolerance; the framework can still rank highly under the chosen weighted utility."))
 
     render_pre_post_calibration(state, frame)
 
@@ -1089,7 +1090,7 @@ def prepare_drift_display(results: Sequence[Mapping[str, Any]]) -> List[Dict[str
             frameworks,
             default=selected,
             key="pre14_drift_framework",
-        ) or selected
+         format_func=framework_label) or selected
         state["drift_selected_framework"] = selected
 
     max_sample = 0
@@ -1116,9 +1117,9 @@ def prepare_drift_display(results: Sequence[Mapping[str, Any]]) -> List[Dict[str
             }
         )
     st.caption(
-        "The total is the sum of **framework-specific detector alerts**, not the number of unique dataset-wide changes."
+        framework_label("The total is the sum of **framework-specific detector alerts**, not the number of unique dataset-wide changes.")
     )
-    st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
+    st.dataframe(display_frame(pd.DataFrame(summary_rows)), use_container_width=True, hide_index=True)
 
     if mode == "Selected framework":
         return [copy.deepcopy(r) for r in raw if str(r.get("framework")) == str(selected)]
@@ -1137,7 +1138,7 @@ def prepare_drift_display(results: Sequence[Mapping[str, Any]]) -> List[Dict[str
     if clustered:
         clustered[0]["drift_events"] = [{"sample": x, "display_clustered": True} for x in episodes]
     st.info(
-        "Display-only clustering grouped {} raw framework alerts into {} drift episodes using a <1-window gap ({} samples). "
-        "Raw detections remain unchanged in the run artifacts.".format(len(all_positions), len(episodes), gap)
+        framework_label("Display-only clustering grouped {} raw framework alerts into {} drift episodes using a <1-window gap ({} samples). "
+        "Raw detections remain unchanged in the run artifacts.".format(len(all_positions), len(episodes), gap))
     )
     return clustered

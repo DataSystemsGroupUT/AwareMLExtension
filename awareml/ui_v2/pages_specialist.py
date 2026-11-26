@@ -1371,9 +1371,9 @@ def sustainability_v2_page():
 
 def trust_calibration_v2_page():
     from .phase16_morten_v2 import phase16_trust_calibration_page_v2
-    return phase16_trust_calibration_page_v2()
+    phase16_trust_calibration_page_v2()
+
 
 def information_seeking_v2_page():
     from .phase17_morten_v2 import information_seeking_research_page_v2
-    return information_seeking_research_page_v2()
-
+    information_seeking_research_page_v2()

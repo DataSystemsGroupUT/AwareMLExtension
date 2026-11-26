@@ -9,6 +9,7 @@ v6.1 deliberately avoids nested ``st.expander`` calls because Streamlit rejects
 expanders inside expanders. Run Studio may wrap this whole renderer in one outer
 expander; per-algorithm override areas therefore use bordered containers + toggles.
 """
+from awareml.ui_v2.framework_labels import framework_label, framework_description, display_labels, display_frame, display_figure
 
 from copy import deepcopy
 from typing import Any, Optional
@@ -98,18 +99,18 @@ def render_framework_configuration(
     if not selected:
         return result
 
-    st.markdown("**Framework algorithms & hyperparameters**")
+    st.markdown(framework_label("**Framework algorithms & hyperparameters**"))
     st.caption(
         "Configure algorithms and hyperparameters for the next benchmark run. "
         "Only backend-supported options are shown."
     )
 
-    tabs = st.tabs(selected)
+    tabs = st.tabs(display_labels(selected))
     for tab, framework in zip(tabs, selected):
         with tab:
             spec = catalog.get(framework) or {}
             current = _coerce_existing(framework, state)
-            st.caption(spec.get("description") or "")
+            st.caption(framework_label(framework_description(framework, spec.get("description") or "")))
             available = runtime_available_algorithms(framework)
             requested = [a for a in current.get("algorithms", []) if a in available]
             if not requested:
@@ -178,7 +179,7 @@ def render_framework_configuration(
             globals_out = {}
             global_specs = spec.get("global") or {}
             if global_specs:
-                st.markdown("**Framework-level controls**")
+                st.markdown(framework_label("**Framework-level controls**"))
                 cols = st.columns(2)
                 display_specs = [
                     (name, pspec)
@@ -220,7 +221,7 @@ def render_framework_configuration(
                     overrides = {}
                     if show_overrides:
                         st.caption(
-                            "Only enabled overrides are locked. Other parameters keep the framework/default behavior."
+                            framework_label("Only enabled overrides are locked. Other parameters keep the framework/default behavior.")
                         )
                         for pname, pspec in params.items():
                             enabled = st.checkbox(

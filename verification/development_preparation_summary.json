@@ -1,0 +1,18 @@
+{
+  "status": "pass",
+  "datasets": 47,
+  "prepared_tasks": 1175,
+  "profiles_from_first": 1000,
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "same_sample_count_for_all_frameworks_per_dataset": true,
+  "source_and_frozen_file_hashes_valid": true,
+  "measured_framework_runs_executed": 0,
+  "campaign_sha256": "1758a78d4fc778f7fdf8d7b916280db76affafee6f97a779119b29d0223c4a45",
+  "note": "Preparation verification only. No new framework outcomes or V3 performance results."
+}

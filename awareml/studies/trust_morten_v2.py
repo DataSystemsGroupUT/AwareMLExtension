@@ -11,12 +11,12 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import pandas as pd
 
-SCHEMA_VERSION = "phase16_trust_calibration_v2_1"
-RANDOMIZATION_VERSION = "phase16_counterbalanced_v3_morten"
-DEFAULT_PROTOCOL_PATH = Path("data/journal/trust_calibration_phase16_v2/frozen_design/protocol.json")
-DEFAULT_MANIFEST_PATH = Path("data/journal/trust_calibration_phase16_v2/frozen_design/manifest.json")
-DEFAULT_STIMULUS_ROOT = Path("data/journal/trust_stimulus_bank_v2/frozen")
-DEFAULT_DB_PATH = Path("artifacts/phase16/trust_calibration.sqlite")
+SCHEMA_VERSION = "phase16_trust_calibration_v3_task_context_r1"
+RANDOMIZATION_VERSION = "phase16_counterbalanced_v4_morten"
+DEFAULT_PROTOCOL_PATH = Path("data/journal/trust_calibration_phase16_v3/frozen_design/protocol.json")
+DEFAULT_MANIFEST_PATH = Path("data/journal/trust_calibration_phase16_v3/frozen_design/manifest.json")
+DEFAULT_STIMULUS_ROOT = Path("data/journal/trust_stimulus_bank_v3/frozen")
+DEFAULT_DB_PATH = Path("artifacts/phase16_task_context_r1/trust_calibration.sqlite")
 ALLOWED_EXPERTISE_GROUPS = ("University / CS student", "Practitioner", "ML / AutoML expert")
 ALLOWED_DECISION_ACTIONS = ("Accept", "Override", "Reject")
 
@@ -41,7 +41,7 @@ def _json(value: Any) -> str:
 def load_protocol(path: Optional[Path] = None) -> Dict[str, Any]:
     p = Path(path or DEFAULT_PROTOCOL_PATH)
     data = json.loads(p.read_text(encoding="utf-8"))
-    if data.get("schema_version") != SCHEMA_VERSION:
+    if data.get("schema_version") != "phase16_trust_calibration_v3":
         raise StudyV2Error("Unexpected Phase-16 v2 protocol schema.")
     return data
 
@@ -61,6 +61,8 @@ class Stimulus:
     reference_evidence: Dict[str, Any]
     condition: str
     error_type: Optional[str]
+    recommendation: str = ""
+    recommended_framework: str = ""
 
     def participant_dict(self, opaque_item_id: str, order_index: int) -> Dict[str, Any]:
         return {
@@ -73,6 +75,8 @@ class Stimulus:
             "source_stage": self.source_stage,
             "source": self.source_name,
             "prompt": self.prompt,
+            "recommendation": self.recommendation,
+            "recommended_framework": self.recommended_framework,
             "explanation": self.explanation,
             "reference_evidence": self.reference_evidence,
         }
@@ -97,11 +101,11 @@ class Assignment:
 
 class StimulusBankV2:
     def __init__(self, root: Optional[Path] = None, verify: bool = True):
-        self.root = Path(root or os.getenv("AWAREML_PHASE16_V2_STIMULUS_ROOT") or DEFAULT_STIMULUS_ROOT)
+        self.root = Path(root or os.getenv("AWAREML_PHASE16_V3_STIMULUS_ROOT") or DEFAULT_STIMULUS_ROOT)
         self.manifest_path = self.root / "manifest.json"
         self.rows = json.loads((self.root / "stimuli_researcher.json").read_text(encoding="utf-8"))
         manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
-        if manifest.get("status") != "frozen" or manifest.get("schema_version") != "trust_stimulus_bank_v2_1":
+        if manifest.get("status") != "frozen" or manifest.get("schema_version") != "trust_stimulus_bank_v3":
             raise StudyV2Error("Trust stimulus bank v2 is not frozen/valid.")
         if verify:
             for name, meta in (manifest.get("files") or {}).items():
@@ -120,7 +124,8 @@ class StimulusBankV2:
                 source_stage=str(row.get("source_stage") or ""), source_name=str(row.get("source_name") or ""),
                 prompt=str(row.get("prompt") or ""), explanation=str(row.get("explanation") or ""),
                 reference_evidence=dict(row.get("evidence_summary") or {}), condition=cond,
-                error_type=row.get("error_type"),
+                error_type=row.get("error_type"), recommendation=str(row.get("recommendation") or ""),
+                recommended_framework=str(row.get("recommended_framework") or ""),
             )
             self.by_id[stim.stimulus_id] = stim
             if stim.pair_id not in self.pairs:
@@ -148,7 +153,7 @@ class StimulusBankV2:
 
 class Phase16V2Store:
     def __init__(self, path: Optional[Path] = None):
-        self.path = Path(path or os.getenv("AWAREML_PHASE16_DB") or DEFAULT_DB_PATH)
+        self.path = Path(path or os.getenv("AWAREML_PHASE16_V3_DB") or DEFAULT_DB_PATH)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
@@ -216,13 +221,16 @@ class Phase16V2Store:
               ratings_json TEXT NOT NULL, open_comment TEXT, submitted_at TEXT NOT NULL,
               PRIMARY KEY(collection_mode, participant_hash));
             """)
+            con.execute("CREATE UNIQUE INDEX IF NOT EXISTS response_once_v3 ON responses(collection_mode,participant_hash,order_index)")
             for definition in ["counterbalance_arm TEXT", "protocol_version TEXT"]:
                 self._add_column(con, "participants", definition)
             for definition in ["scenario_id TEXT", "framework_context TEXT", "counterbalance_arm TEXT"]:
                 self._add_column(con, "assignments", definition)
             for definition in ["pair_id TEXT", "scenario_id TEXT", "framework_context TEXT",
                                "override_targets_json TEXT", "override_correction_text TEXT",
-                               "evidence_question_count INTEGER DEFAULT 0", "initial_locked_at TEXT"]:
+                               "evidence_question_count INTEGER DEFAULT 0", "initial_locked_at TEXT",
+                               "explanation_action TEXT", "explanation_targets_json TEXT", "explanation_correction TEXT",
+                               "decision_target TEXT", "scope_basis TEXT", "recommendation_correct INTEGER"]:
                 self._add_column(con, "responses", definition)
 
     def participant(self, mode: str, ph: str) -> Optional[dict]:
@@ -279,7 +287,7 @@ class Phase16V2Store:
 
     def save_initial(self, mode: str, ph: str, order: int, trust_items: Dict[str, int], perceived: int, fluency: int, confidence: int, trust_rating: float):
         with self._connect() as con:
-            con.execute("""INSERT OR REPLACE INTO phase16_initial_ratings_v2(collection_mode,participant_hash,order_index,trust_rating,
+            con.execute("""INSERT INTO phase16_initial_ratings_v2(collection_mode,participant_hash,order_index,trust_rating,
             trust_items_json,perceived_correctness,fluency_rating,perceived_confidence,locked_at)
             VALUES(?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)""", (mode, ph, order, trust_rating, _json(trust_items), perceived, fluency, confidence))
 
@@ -302,7 +310,7 @@ class Phase16V2Store:
         with self._connect() as con:
             return [dict(r) for r in con.execute(q, params).fetchall()]
 
-    def save_response(self, mode: str, ph: str, assignment: dict, decision: str, response_time: float, override_targets: List[str], correction: str):
+    def save_response(self, mode: str, ph: str, assignment: dict, decision: str, response_time: float, override_targets: List[str], correction: str, explanation_action: str, explanation_targets: List[str], explanation_correction: str, scope_basis: str):
         init = self.initial(mode, ph, int(assignment["order_index"]))
         if init is None: raise StudyV2Error("Initial evaluation must be locked before the final decision.")
         with self._connect() as con:
@@ -312,12 +320,12 @@ class Phase16V2Store:
             con.execute("""INSERT INTO responses(collection_mode,participant_hash,expertise_group,order_index,opaque_item_id,stimulus_id,
             source_stage,correctness_condition,trust_rating,trust_items_json,perceived_correctness,fluency_rating,perceived_confidence,
             decision_action,accepted,response_time_sec,submitted_at,pair_id,scenario_id,framework_context,override_targets_json,
-            override_correction_text,evidence_question_count,initial_locked_at)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,?,?,?,?,?,?,?)""",
+            override_correction_text,evidence_question_count,initial_locked_at,explanation_action,explanation_targets_json,explanation_correction,decision_target,scope_basis,recommendation_correct)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (mode, ph, group, assignment["order_index"], assignment["opaque_item_id"], assignment["stimulus_id"], assignment["source_stage"],
              assignment["correctness_condition"], init["trust_rating"], _json(init["trust_items"]), init["perceived_correctness"], init["fluency_rating"],
              init["perceived_confidence"], decision, 1 if decision == "Accept" else 0, response_time, assignment["pair_id"], assignment.get("scenario_id"),
-             assignment.get("framework_context"), _json(override_targets), str(correction or "").strip(), qcount, init["locked_at"]))
+             assignment.get("framework_context"), _json(override_targets), str(correction or "").strip(), qcount, init["locked_at"], explanation_action, _json(explanation_targets), explanation_correction.strip(), "framework_recommendation", scope_basis, 1))
         if self.current_order(mode, ph) is None:
             with self._connect() as con:
                 con.execute("UPDATE participants SET completed_at=CURRENT_TIMESTAMP WHERE collection_mode=? AND participant_hash=? AND completed_at IS NULL", (mode, ph))
@@ -357,6 +365,9 @@ class TrustCalibrationStudyV2:
     def stimulus_sha(self): return _sha(self.bank.manifest_path)
 
     def assert_final_ready(self):
+        from .morten_review_v3 import review_status
+        review = review_status(root=self.bank.root)
+        if not review["ready"]: raise StudyV2Error("Exact explanation review is pending: two independent assessor reviews of every v3 stimulus are required before final collection. Pilot preview is available.")
         manifest = json.loads(DEFAULT_MANIFEST_PATH.read_text(encoding="utf-8"))
         if manifest.get("status") != "frozen": raise StudyV2Error("Phase-16 v2 design is not frozen.")
         expected = str(((manifest.get("files") or {}).get("protocol.json") or {}).get("sha256") or "")
@@ -406,7 +417,7 @@ class TrustCalibrationStudyV2:
         ph = self.participant_hash(code, mode)
         existing = self.store.participant(mode, ph)
         if existing:
-            if existing.get("protocol_version") != SCHEMA_VERSION: raise StudyV2Error("This code belongs to a pre-revision session. Use a new participant code for v2.1.")
+            if existing.get("protocol_version") != SCHEMA_VERSION or existing.get("protocol_sha256") != self.protocol_sha or existing.get("stimulus_manifest_sha256") != self.stimulus_sha: raise StudyV2Error("This code belongs to a pre-revision session. Use a new participant code for v2.1.")
             return existing
         arm = "A" if self.store.registration_count(mode) % 2 == 0 else "B"
         assignments = self._assignment(ph, arm)
@@ -423,6 +434,8 @@ class TrustCalibrationStudyV2:
 
     def lock_initial(self, ph: str, order: int, trust_items: Dict[str, int], perceived: int, fluency: int, confidence: int, mode: Optional[str] = None) -> float:
         mode = mode or self.collection_mode(); vals = []
+        if self.store.current_order(mode, ph) != order: raise StudyV2Error("Only the current assigned trial may be rated.")
+        if self.store.initial(mode, ph, order) is not None: raise StudyV2Error("Initial evaluation is already locked.")
         for item_id in ["stias_confident", "stias_reliable", "stias_trust"]:
             value = trust_items.get(item_id)
             if value is None or not 1 <= int(value) <= 7: raise StudyV2Error("Complete all three S-TIAS statements.")
@@ -434,13 +447,20 @@ class TrustCalibrationStudyV2:
         self.store.log_event(mode, ph, order, "initial_evaluation_locked", {"trust_rating": score, "perceived_correctness": perceived, "fluency_rating": fluency, "perceived_confidence": confidence})
         return score
 
-    def final_submit(self, ph: str, order: int, decision: str, response_time: float, override_targets: List[str], correction: str, mode: Optional[str] = None):
+    def final_submit(self, ph: str, order: int, decision: str, response_time: float, override_targets: List[str], correction: str, mode: Optional[str] = None, explanation_action: Optional[str] = None, explanation_targets: Optional[List[str]] = None, explanation_correction: str = "", scope_basis: Optional[str] = None):
+        from .morten_review_v3 import EXPLANATION_ACTIONS, SCOPE_CHOICES
         mode = mode or self.collection_mode()
+        if self.store.current_order(mode, ph) != order: raise StudyV2Error("This trial is not current or is already submitted.")
+        if self.store.initial(mode, ph, order) is None: raise StudyV2Error("Initial evaluation must be locked before the final decision.")
+        if explanation_action not in EXPLANATION_ACTIONS: raise StudyV2Error("Choose what you would do with the explanation separately.")
+        if scope_basis not in SCOPE_CHOICES: raise StudyV2Error("Identify the scope of your recommendation decision.")
+        if explanation_action == "Correct before use" and (not explanation_targets or not explanation_correction.strip()): raise StudyV2Error("Select the explanation correction target and write the correction.")
         if decision not in ALLOWED_DECISION_ACTIONS: raise StudyV2Error("Choose Accept, Override or Reject.")
         if decision == "Override" and (not override_targets or not str(correction or "").strip()): raise StudyV2Error("For Override, select what you would correct and briefly state the correction.")
         a = next(r for r in self.store.assignment_rows(mode, ph) if int(r["order_index"]) == order)
         self.store.log_event(mode, ph, order, "final_decision", {"decision": decision, "override_targets": override_targets, "correction": str(correction or "").strip()})
-        self.store.save_response(mode, ph, a, decision, max(float(response_time), 0.001), override_targets, correction)
+        self.store.save_response(mode, ph, a, decision, max(float(response_time), 0.001), override_targets, correction,
+                                 explanation_action, explanation_targets or [], explanation_correction, scope_basis)
 
     def progress(self, ph: str, mode: Optional[str] = None) -> Tuple[int, int]:
         mode = mode or self.collection_mode(); p = self.store.participant(mode, ph)
@@ -457,11 +477,15 @@ def mean_sd(values: Sequence[Any]) -> Tuple[Optional[float], Optional[float]]:
 
 def analyze_v2(store: Phase16V2Store, mode: str = "final") -> Dict[str, Any]:
     participants, responses = pd.DataFrame(store.participant_rows(mode)), pd.DataFrame(store.response_rows(mode))
-    if participants.empty: return {"status": "insufficient_data", "registered": 0, "completed": 0}
+    from .morten_review_v3 import scenario_coverage, paired_inference, evidence_association, review_status, agency_evidence_association
+    if participants.empty: return {"status": "insufficient_data", "registered": 0, "completed": 0,
+                                  "all_scenario_coverage": scenario_coverage(pd.DataFrame()), "human_review": review_status()}
     completed = participants[participants["completed_at"].notna()].copy()
     valid = set(completed["participant_hash"].astype(str))
     frame = responses[responses["participant_hash"].astype(str).isin(valid)].copy() if not responses.empty else responses
     out = {"status": "ok" if len(frame) else "insufficient_data", "registered": len(participants), "completed": len(completed), "trials": len(frame)}
+    out["all_scenario_coverage"] = scenario_coverage(frame)
+    out["human_review"] = review_status()
     if frame.empty: return out
     for c in ["trust_rating", "response_time_sec", "order_index", "evidence_question_count"]: frame[c] = pd.to_numeric(frame[c], errors="coerce")
     out["condition_summary"] = {}
@@ -473,6 +497,18 @@ def analyze_v2(store: Phase16V2Store, mode: str = "final") -> Dict[str, Any]:
         mean, sd = mean_sd(pivot["correct"] - pivot["incorrect"]); out["trust_gap"] = {"mean": mean, "sd": sd, "n": len(pivot)}
     out["pair_coverage"] = [{"pair_id": p, "scenario_id": s, "framework": fw, "source_stage": st, "evaluations": len(g), "correct": int((g["correctness_condition"] == "correct").sum()), "incorrect": int((g["correctness_condition"] == "incorrect").sum())}
                             for (p, s, fw, st), g in frame.groupby(["pair_id", "scenario_id", "framework_context", "source_stage"], dropna=False)]
+    if "correct" in pivot and "incorrect" in pivot:
+        out["primary_inference"] = paired_inference((pivot["correct"]-pivot["incorrect"]).dropna())
+    out["evidence_association"] = evidence_association(frame)
+    out["agency_evidence_association"] = agency_evidence_association(frame, store.secondary_rows(mode))
+    out["reliance_interpretation"] = "Recommendation correctness is held constant. Recommendation Accept on an incorrect explanation is not automatically overreliance."
+    if "explanation_action" in frame:
+        out["explanation_action_by_condition"] = pd.crosstab(frame["correctness_condition"],frame["explanation_action"]).reset_index().to_dict("records")
+        bad=frame[frame["correctness_condition"].eq("incorrect")]
+        good=frame[frame["correctness_condition"].eq("correct")]
+        out["explanation_overreliance_rate"] = float(bad["explanation_action"].eq("Use as shown").mean()) if len(bad) else None
+        out["supported_explanation_nonuse_rate"] = float(good["explanation_action"].isin(["Correct before use","Do not use"]).mean()) if len(good) else None
+    out["scope_basis_counts"] = frame["scope_basis"].value_counts().to_dict() if "scope_basis" in frame else {}
     out["decision_counts"] = frame["decision_action"].value_counts().to_dict()
     overrides = frame[frame["decision_action"] == "Override"]
     out["override_correction_capture_rate"] = None if len(overrides) == 0 else float(overrides["override_correction_text"].fillna("").astype(str).str.strip().ne("").mean())
@@ -480,7 +516,7 @@ def analyze_v2(store: Phase16V2Store, mode: str = "final") -> Dict[str, Any]:
     out["expertise_descriptive"] = []
     for exp, g in frame.groupby("expertise_group"):
         mean, sd = mean_sd(g["trust_rating"]); out["expertise_descriptive"].append({"expertise_group": exp, "participants": g["participant_hash"].nunique(), "mean_trust": mean, "sd_trust": sd})
-    out["trust_vs_trial_order_spearman"] = float(frame["trust_rating"].rank().corr(frame["order_index"].rank()))
-    out["response_time_vs_trial_order_spearman"] = float(frame["response_time_sec"].rank().corr(frame["order_index"].rank()))
+    out["trust_vs_trial_order_spearman"] = float(frame["trust_rating"].rank().corr(frame["order_index"].rank())) if frame["trust_rating"].nunique()>1 and frame["order_index"].nunique()>1 else None
+    out["response_time_vs_trial_order_spearman"] = float(frame["response_time_sec"].rank().corr(frame["order_index"].rank())) if frame["response_time_sec"].nunique()>1 and frame["order_index"].nunique()>1 else None
     out["completed_counterbalance_arms"] = completed["counterbalance_arm"].value_counts().to_dict() if "counterbalance_arm" in completed else {}
     return out
